@@ -79,6 +79,13 @@ class ScaffoldTests(unittest.TestCase):
             'python3.12', str(p/'.opencode/run-local.py'), '--task', str(p/'task.md')], text=True))
         self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'], 'openai/gpt-6.1-sol')
 
+    def test_builders_cannot_edit_managed_root_config(self):
+        config=json.loads((HERE/'files/opencode.json').read_text())
+        for role in ['SCV','probe']:
+            for resource in ['opencode.json','*/opencode.json']:
+                self.assertIn({'action':'edit','resource':resource,'effect':'deny'},
+                              config['agents'][role]['permissions'])
+
     def test_existing_project_refused(self):
         p=self.root/'exists';p.mkdir();(p/'important').write_text('keep')
         r=self.run_tool('exists','--root',str(self.root));self.assertNotEqual(r.returncode,0)
@@ -386,6 +393,10 @@ class ScaffoldTests(unittest.TestCase):
         agents={a['name']:a for a in json.loads(r.stdout)}
         self.assertEqual(agents['SCV']['model'],{'providerID':'lmstudio','id':'project-worker'})
         self.assertEqual(agents['SCV']['steps'],7)
+        for role in ['SCV','probe']:
+            for resource in ['opencode.json','*/opencode.json']:
+                rules=[r for r in agents[role]['permissions'] if r['action']=='edit' and r['resource']==resource]
+                self.assertEqual(rules[-1]['effect'],'deny')
         self.assertEqual(agents['Sentry']['model'],{'providerID':'openai','id':'gpt-6.1-sol'})
         push=[r for r in agents['Arbiter']['permissions'] if r['action']=='shell' and r['resource']=='git push*']
         self.assertEqual(push[-1]['effect'],'deny')

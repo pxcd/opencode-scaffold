@@ -81,6 +81,16 @@
         },
         {
           "action": "edit",
+          "resource": "opencode.json",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/opencode.json",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
           "resource": ".opencode/*",
           "effect": "deny"
         },
@@ -113,6 +123,16 @@
         {
           "action": "execute",
           "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "opencode.json",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/opencode.json",
           "effect": "deny"
         },
         {
