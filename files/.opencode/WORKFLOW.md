@@ -29,9 +29,38 @@ and project plugins before inference; a provider ID alone does not prove a local
 endpoint. Do not install software, reconfigure providers or start competing GPU
 workloads without authorization. Configuration discovery does not run inference.
 
+## Startup preflight — before substantive work
+
+Configuration discovery and read-only contract preparation may run before the
+project is ready. Before implementation, verification for delivery, worker dispatch,
+commits, pushes or PR/merge actions, establish both of the following:
+
+- The actual primary session agent is **Arbiter**, not merely a Sol model or a
+  configured default. Existing sessions may retain `build` or another agent after
+  scaffold installation. If the active primary role is wrong or cannot be confirmed,
+  stop with the exact next action: select Arbiter (or open a new Arbiter session).
+  Do not silently act as coordinator, invoke Arbiter as a child, or work around
+  missing delegation through shell/API calls. Child workers verify their own
+  assigned role and location; this primary-session check is not a demand that
+  SCV, probe, Overlord or Sentry switch themselves to Arbiter.
+- Root AGENTS.md contains one exact `Status: READY` line and a verified project
+  contract: actual stack/check commands, invariants, access and acceptance boundaries.
+  UNCONFIGURED, missing or conflicting status means setup, not task execution.
+  Inspect only what is authorized to propose the missing contract, clarify genuinely
+  missing permissions/acceptance, and finish that setup before resuming the task.
+  A marker alone is not evidence that commands or access rules were verified.
+
+Report the confirmed checkout, primary role, branch and readiness before the first
+substantive milestone. The optional launcher selects Arbiter explicitly and enforces
+the readiness marker and local project-override compatibility in code; direct
+OpenCode sessions must follow this preflight policy. This policy is not a native
+runtime lock or a guarantee that an arbitrary agent follows instructions. Global
+config/session overrides and real provider endpoints still need native inspection.
+
 ## Native task loop
 
-1. Confirm absolute checkout, dirty state, issue ownership and any active session.
+1. Complete startup preflight; confirm absolute checkout, dirty state, issue
+   ownership and any active session.
    Preserve existing work and never duplicate a possibly completed operation.
    Record original scope, acceptance, allowed paths and invariants in
    `.opencode/evidence/<task>/task.md`; avoid copying the whole chat/history.
