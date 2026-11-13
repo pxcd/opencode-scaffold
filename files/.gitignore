@@ -1,0 +1,10 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.opencode/evidence/
+.worktrees/
+__pycache__/
+*.py[cod]
+.opencode/local.json
+.opencode/.worker.lock

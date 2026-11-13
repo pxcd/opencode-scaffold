@@ -1,0 +1,10 @@
+{
+  "local_provider_ids": [
+    "lmstudio"
+  ],
+  "models": {
+    "SCV": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+    "probe": "lmstudio/qwen3.6-35b-a3b-mlx",
+    "Overlord": "lmstudio/swift-1.5-qwen3.8-27b-splash"
+  }
+}
