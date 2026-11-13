@@ -19,7 +19,11 @@ def routing(root):
     if profile_path.exists():
         profile = json.loads(profile_path.read_text())
     else:
-        native = json.loads((root / '.opencode/opencode.json').read_text())
+        native = json.loads((root / 'opencode.json').read_text())
+        overrides = json.loads((root / '.opencode/opencode.json').read_text())
+        native['agents'] = {**native['agents'], **{
+            role: {**native['agents'].get(role, {}), **settings}
+            for role, settings in overrides.get('agents', {}).items()}}
         profile = {
             'local_provider_ids': ['lmstudio'],
             'models': {role: native['agents'][role]['model'] for role in ROLES},
@@ -34,6 +38,12 @@ def routing(root):
             raise ValueError(f'Set a registered local model for {role}')
         if model.split('/', 1)[0] not in providers:
             raise ValueError(f'{role} model is outside local_provider_ids')
+    if not profile_path.exists():
+        # With no explicit launcher profile, preserve native worker/helper routes,
+        # including project-authorized helper models and enabled providers.
+        return {'model': ARBITER_MODEL, 'default_agent': 'Arbiter',
+                'agents': {'Arbiter': {'model': ARBITER_MODEL},
+                           'Sentry': {'model': ARBITER_MODEL}}}
     return {
         'model': ARBITER_MODEL,
         'enabled_providers': list(dict.fromkeys(['openai', *providers])),
@@ -41,7 +51,8 @@ def routing(root):
         'agents': {**{name: {'model': models[name] if name in ROLES else models['Overlord']}
                    for name in (*ROLES, *HELPERS)},
                    'title': {'model': models['probe']},
-                   'Arbiter': {'model': ARBITER_MODEL}},
+                   'Arbiter': {'model': ARBITER_MODEL},
+                   'Sentry': {'model': ARBITER_MODEL}},
     }
 
 
@@ -69,18 +80,18 @@ def main():
             'opencode', 'run', '--standalone', '--agent', args.role,
             '--model', config['agents'][args.role]['model'], '--format', 'json',
             '--file', str(task),
-            'Own the attached task through native local delegation, recovery and fresh QA. Codex intervention is optional. Preserve project acceptance and authorization boundaries; return evidence.',
+            'Own the attached task through native local delegation, recovery, fresh Overlord QA and Sentry code review. Codex intervention is optional. Preserve project acceptance and authorization boundaries; return evidence.',
         ]
         if args.session:
             command += ['--session', args.session]
         if not args.doctor and not args.execute:
             print(json.dumps({'cwd': str(root), 'argv': command, 'runtime_config': config,
-                              'note': 'Preview only. Sol is cloud; workers/helpers are local. Provider IDs do not verify endpoints.'}, indent=2))
+                              'note': 'Preview only. Arbiter/Sentry use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
             return 0
         if args.execute:
-            contract = (root / '.opencode/PROJECT.md').read_text()
+            contract = (root / 'AGENTS.md').read_text()
             if 'Status: READY' not in contract or 'Status: UNCONFIGURED' in contract:
-                raise ValueError('Complete .opencode/PROJECT.md and mark Status: READY before execution')
+                raise ValueError('Complete AGENTS.md and mark Status: READY before execution')
             if not args.routing_reviewed:
                 raise ValueError('Inspect native doctor output, provider endpoints and merged plugins first; then pass --routing-reviewed')
         evidence = root / '.opencode/evidence'
