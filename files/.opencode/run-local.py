@@ -19,7 +19,11 @@ def routing(root):
     if profile_path.exists():
         profile = json.loads(profile_path.read_text())
     else:
-        native = json.loads((root / '.opencode/opencode.json').read_text())
+        native = json.loads((root / 'opencode.json').read_text())
+        overrides = json.loads((root / '.opencode/opencode.json').read_text())
+        native['agents'] = {**native['agents'], **{
+            role: {**native['agents'].get(role, {}), **settings}
+            for role, settings in overrides.get('agents', {}).items()}}
         profile = {
             'local_provider_ids': ['lmstudio'],
             'models': {role: native['agents'][role]['model'] for role in ROLES},
@@ -85,9 +89,9 @@ def main():
                               'note': 'Preview only. Arbiter/Sentry use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
             return 0
         if args.execute:
-            contract = (root / '.opencode/PROJECT.md').read_text()
+            contract = (root / 'AGENTS.md').read_text()
             if 'Status: READY' not in contract or 'Status: UNCONFIGURED' in contract:
-                raise ValueError('Complete .opencode/PROJECT.md and mark Status: READY before execution')
+                raise ValueError('Complete AGENTS.md and mark Status: READY before execution')
             if not args.routing_reviewed:
                 raise ValueError('Inspect native doctor output, provider endpoints and merged plugins first; then pass --routing-reviewed')
         evidence = root / '.opencode/evidence'

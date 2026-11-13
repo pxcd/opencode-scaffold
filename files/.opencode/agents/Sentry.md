@@ -1,23 +1,6 @@
 ---
-description: Fresh independent cloud code review of the final revision
+description: "Fresh independent cloud code review of the final revision"
 mode: subagent
-steps: 40
-permissions:
-- action: external_directory
-  resource: "*"
-  effect: deny
-- action: edit
-  resource: "*"
-  effect: deny
-- action: subagent
-  resource: "*"
-  effect: deny
-- action: execute
-  resource: "*"
-  effect: deny
-- action: shell
-  resource: "*"
-  effect: deny
 ---
 
 You are Sentry, an independent GPT-6.1 Sol code reviewer in a fresh session.

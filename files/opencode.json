@@ -1,0 +1,308 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".opencode/WORKFLOW.md",
+    ".opencode/PROJECT.md"
+  ],
+  "experimental": {
+    "subagent_depth": 1
+  },
+  "default_agent": "Arbiter",
+  "compaction": {
+    "auto": true,
+    "keep": {
+      "tokens": 12000
+    },
+    "buffer": 16000
+  },
+  "tool_output": {
+    "max_lines": 200,
+    "max_bytes": 12000
+  },
+  "permissions": [
+    {
+      "action": "subagent",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git push*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git reset*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "git clean*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "osascript *",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "open *",
+      "effect": "deny"
+    }
+  ],
+  "plugins": [
+    "./.opencode/plugins/step-limit-compat"
+  ],
+  "agents": {
+    "SCV": {
+      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "steps": 32,
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "execute",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".opencode/*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.config/opencode/*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".opencode/evidence/*",
+          "effect": "allow"
+        }
+      ]
+    },
+    "probe": {
+      "model": "lmstudio/qwen3.6-35b-a3b-mlx",
+      "steps": 32,
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "execute",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".opencode/*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.config/opencode/*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".opencode/evidence/*",
+          "effect": "allow"
+        }
+      ]
+    },
+    "Overlord": {
+      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "steps": 40,
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "execute",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": ".opencode/evidence/*",
+          "effect": "allow"
+        }
+      ]
+    },
+    "compaction": {
+      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash"
+    },
+    "title": {
+      "model": "lmstudio/qwen3.6-35b-a3b-mlx"
+    },
+    "summary": {
+      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash"
+    },
+    "Arbiter": {
+      "model": "openai/gpt-6.1-sol",
+      "steps": 80,
+      "permissions": [
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "SCV",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "Overlord",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "probe",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "Sentry",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--force*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -f*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -f*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -uf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -qf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -vf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* +*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--mirror*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--delete*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* :*",
+          "effect": "deny"
+        }
+      ]
+    },
+    "Sentry": {
+      "model": "openai/gpt-6.1-sol",
+      "steps": 40,
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "execute",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
+    }
+  },
+  "model": "openai/gpt-6.1-sol",
+  "enabled_providers": [
+    "openai",
+    "lmstudio"
+  ]
+}

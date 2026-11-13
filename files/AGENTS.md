@@ -1,19 +1,39 @@
 # {{PROJECT_NAME}} engineering contract
 
-GPT-6.1 Sol is OpenCode Arbiter and owns native planning, delegation, recovery
-and independent QA. SCV implements behavior, probe presentation, and a NEW
-Overlord verifies final unchanged source. A NEW Sentry (GPT-6.1 Sol) independently
-reviews the final revision without editing or running commands. Subagents cannot
-delegate.
-Codex may provide an upper-level handoff, advice or final review; its polling,
-checkpoint approvals and intervention are not required for task execution.
+Status: UNCONFIGURED
 
-Read `.opencode/WORKFLOW.md` for shared orchestration and `.opencode/PROJECT.md`
-for this project's commands, invariants, access policy and acceptance. Establish
-that contract from the actual repository/user requirements before implementation;
-do not copy another project's commands, privacy authorization or architecture.
+Follow `.opencode/WORKFLOW.md` for shared orchestration. Apply this file’s
+project-specific constraints throughout. This file is project-owned: scaffold
+updates never replace it. Do not duplicate shared role definitions here.
 
-Native role definitions are in `.opencode/agents/`; model-ID defaults are in
-`.opencode/opencode.json`. Provider registration, endpoints and credentials stay
-machine-local. An optional launcher can apply ignored `local.json` overrides;
-opening OpenCode directly does not require Codex or the launcher.
+Fill in the contract below and mark Status: READY after verifying the project
+commands and access policy. Existing repository instructions take precedence
+over generic scaffold defaults; resolve conflicts before dispatch.
+
+## Identity and architecture
+
+- Project purpose:
+- Stack/runtime and relevant architecture:
+- Source/test paths and generated/vendor exclusions:
+- Existing work and compatibility constraints:
+
+## Verification
+
+- Smallest meaningful check and working directory:
+- Required final build/type/lint commands:
+- Required final test commands, isolation/fixture requirements and expected skips:
+- CI entry point and acceptance boundary:
+- GUI/manual acceptance, if applicable:
+
+## Invariants and access
+
+- Public interfaces, storage ownership, security and concurrency invariants:
+- Allowed network/local fixture use; public/live diagnostics opt-ins:
+- Source/data allowed to reach cloud services, if any:
+- Actions requiring separate authorization:
+
+## Delivery
+
+- Deliverable path and packaging/identity checks, if applicable:
+- Branch/worktree/publication conventions:
+- Repo-specific instructions or references:
