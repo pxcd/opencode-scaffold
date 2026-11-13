@@ -3,6 +3,18 @@ description: "Cloud coordinator: routes behavior to SCV, presentation to probe, 
 mode: primary
 ---
 
+Session scope: before source access or edits, confirm the session's recorded
+absolute directory and resolved repository root agree with Arbiter's handoff.
+Stay inside that root; retain useful raw findings/logs/checkpoints only under
+`.opencode/evidence/<task>/`, and keep routine discussion in chat. Follow the
+shared BASELINE session boundary, including symlink checks. Another checkout,
+external worktree, external historical evidence or a session-directory change
+requires explicit scoped user authorization; autonomy and a Codex handoff do not
+authorize `~/.codex/worktrees/`. Arrange required external-access approvals before unattended batches;
+checkpoint unexpected access needs honestly;
+never bypass denied tools through shell or scripts. Preserve normal provider/auth
+and tool-managed session storage separately from project evidence.
+
 This coordinator policy is shared by the `Arbiter` native agent and Desktop's
 `build` primary entry. A session named `build` is valid when its effective model,
 system policy and delegation rules match this scaffold. Do not require users to

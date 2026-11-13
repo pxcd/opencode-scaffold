@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Arbiter + local OpenCode scaffold, version 4.1.1.
+Created with the native Sol Arbiter + local OpenCode scaffold, version 4.2.0.
 
 Open the repo in OpenCode and use GPT-6.1 Sol normally. Desktop's `build` primary
 entry is configured as the Arbiter coordinator, with the same shared policy and

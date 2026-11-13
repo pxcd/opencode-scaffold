@@ -1,0 +1,73 @@
+{
+  "description": "Exact fingerprints of reusable pre-manifest native role snapshots. No project instructions or credentials. Unknown role contents are never adopted.",
+  "roles": {
+    "Arbiter": {
+      "30ae33afaa8ed30feaf8ca61f78a7b1a806677701481962adbb709e8ec56f63d": {
+        "snapshot": "native-v3",
+        "settings": {
+          "model": "openai/gpt-6.1-sol",
+          "steps": 80,
+          "mode": "primary"
+        }
+      },
+      "d96ebb84cc4713dd9b4ea1cac4b54b9b9e0866f6dcf3b37273cc3276de03fcc5": {
+        "snapshot": "starter-v3",
+        "settings": {
+          "steps": 80,
+          "mode": "primary"
+        }
+      }
+    },
+    "SCV": {
+      "8e405b397bc0a2069fd61c107307bca86fe6e465dd9b4580ee764853ffc3850d": {
+        "snapshot": "native-v3",
+        "settings": {
+          "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+          "steps": 32,
+          "mode": "subagent"
+        }
+      },
+      "0dab3c7f2f2af5b132013557d43ffdc39017ad91d1a0adf7ba6c72169236502e": {
+        "snapshot": "starter-v3",
+        "settings": {
+          "steps": 32,
+          "mode": "subagent"
+        }
+      }
+    },
+    "probe": {
+      "3a8b8dbdaf9748e0fc3179e56003ff0ab7bcf5426966bf55733ad14363fb8991": {
+        "snapshot": "native-v3",
+        "settings": {
+          "model": "lmstudio/qwen3.6-35b-a3b-mlx",
+          "steps": 32,
+          "mode": "subagent"
+        }
+      },
+      "e770b35456bece36faef528f268c798337cc5b046d64fd97a8b3a7e93432f5c6": {
+        "snapshot": "starter-v3",
+        "settings": {
+          "steps": 32,
+          "mode": "subagent"
+        }
+      }
+    },
+    "Overlord": {
+      "ba0f1e1b1e4176cbff08101044d3a9fdb5bef281211fd56e33402ac5443ff1c8": {
+        "snapshot": "native-v3",
+        "settings": {
+          "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+          "steps": 40,
+          "mode": "subagent"
+        }
+      },
+      "a6d0aa27b2fe7b32060621d344f98108190dda1c13df48b3d0ee4c4c60a0fa6e": {
+        "snapshot": "starter-v3",
+        "settings": {
+          "steps": 40,
+          "mode": "subagent"
+        }
+      }
+    }
+  }
+}

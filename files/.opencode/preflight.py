@@ -1,19 +1,21 @@
 """Shared scaffold compatibility checks; no inference or project writes."""
 from fnmatch import fnmatchcase
 import json
+import os
 from pathlib import Path
 
 OVERRIDES = Path('.opencode/opencode.json')
 
 
-def validate_overrides(target, defaults):
+def validate_overrides(target, defaults, overrides=None):
     """Check scaffold invariants without rewriting project-owned configuration."""
     if (target / '.opencode/opencode.jsonc').exists() or (target / 'opencode.jsonc').exists():
         raise ValueError('JSONC config requires a reviewed migration to the scaffold JSON override layout')
     path = target / OVERRIDES
     if path.is_symlink():
         raise ValueError('Refusing symlink project overrides')
-    overrides = json.loads(path.read_text()) if path.exists() else {}
+    if overrides is None:
+        overrides = json.loads(path.read_text()) if path.exists() else {}
     if not isinstance(overrides, dict):
         raise ValueError('Project overrides must be a JSON object')
     if overrides.get('default_agent', 'Arbiter') != 'Arbiter':
@@ -37,6 +39,16 @@ def validate_overrides(target, defaults):
             not isinstance(r, dict) or not all(isinstance(r.get(k), str) for k in ('action', 'resource', 'effect'))
             or r['effect'] not in ('deny', 'allow', 'ask') for r in global_rules):
         raise ValueError('Project permissions must be a list of action/resource/effect rules')
+    protected = {'opencode.json', 'opencode.jsonc', '.opencode/opencode.json', '.opencode/opencode.jsonc'}
+    # Inspect names, not contents. Include shipped and existing custom orchestration;
+    # never walk investigation logs or dependency/vendor trees for this check.
+    for folder in (Path(__file__).resolve().parent, target / '.opencode'):
+        for parent, directories, files in os.walk(folder, followlinks=False):
+            directories[:] = [d for d in directories if d not in ('evidence', 'node_modules', '__pycache__', '.git')]
+            for name in files:
+                relative = (Path(parent) / name).relative_to(folder)
+                if relative != Path('PROJECT.md'):
+                    protected.add(str(Path('.opencode') / relative))
     for role, shared in defaults['agents'].items():
         custom = agents.get(role, {})
         if not isinstance(custom, dict):
@@ -81,6 +93,14 @@ def validate_overrides(target, defaults):
                 if fnmatchcase(action, rule['action']) and fnmatchcase(resource, rule['resource']):
                     effect = rule['effect']
             return effect
+        if role in (*coordinators, 'SCV', 'probe', 'Overlord', 'Sentry', 'title', 'summary', 'compaction'):
+            if decision('external_directory', '*') == 'allow':
+                raise ValueError(f'Project override grants unrestricted external access to {role}; use explicitly authorized scoped paths')
+        if role in ('SCV', 'probe', 'Overlord'):
+            for path in sorted(protected):
+                for resource in (path, str(target.resolve() / path)):
+                    if decision('edit', resource) == 'allow':
+                        raise ValueError(f'Project override permits {role} to edit orchestration: {path}')
         if role in coordinators:
             children = {r['resource'] for r in shared['permissions']
                         if r['action'] == 'subagent' and r['effect'] == 'allow'}

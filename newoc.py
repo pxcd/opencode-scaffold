@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 TEMPLATE = Path(__file__).resolve().parent / 'files'
 VERSION = (TEMPLATE.parent / 'TEMPLATE_VERSION').read_text().strip()
@@ -31,6 +32,48 @@ def managed(relative):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def atomic_write(path, data, mode=None):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix='.newoc-', dir=path.parent)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            stream.write(data)
+        os.chmod(temporary, mode if mode is not None else 0o644)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def apply_files(target, changes, new_mode=None):
+    """Atomic per-file replacement, with rollback if a later write fails."""
+    previous = {}
+    for path, _ in changes:
+        safe_update_destination(target, path)
+        previous[path] = (path.read_bytes(), path.stat().st_mode & 0o777) if path.exists() else (None, None)
+    completed = []
+    try:
+        for path, data in changes:
+            completed.append(path)
+            atomic_write(path, data, previous[path][1] if previous[path][1] is not None else new_mode)
+    except BaseException as error:
+        failures = []
+        for path in reversed(completed):
+            data, mode = previous[path]
+            try:
+                if data is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    atomic_write(path, data, mode)
+            except OSError:
+                failures.append(str(path.relative_to(target)))
+        if failures:
+            raise OSError('Update failed and rollback needs recovery for: ' + ', '.join(failures)) from error
+        if isinstance(error, KeyboardInterrupt):
+            raise
+        raise OSError(f'Update failed; original project files restored: {error}') from error
 
 
 def template_files():
@@ -57,6 +100,33 @@ def safe_update_destination(target, destination):
             raise ValueError(f'Refusing symlink update destination: {part}')
         if part != destination and part.exists() and not part.is_dir():
             raise ValueError(f'Parent is not a directory: {part}')
+
+
+def evidence_ignore_status(target):
+    """Check nested rules against the proposed root ignore without project writes."""
+    if not target.exists():
+        return False
+    nested = target / '.opencode/.gitignore'
+    if nested.exists() or nested.is_symlink():
+        safe_update_destination(target, nested)
+        ignore = target / '.gitignore'
+        safe_update_destination(target, ignore)
+        current = ignore.read_bytes() if ignore.exists() else b''
+        # Directory-only negations need a real directory to evaluate. Mirror only
+        # ignore policy in a disposable repo, never create evidence in the project.
+        with tempfile.TemporaryDirectory(prefix='newoc-ignore-') as temporary:
+            probe = Path(temporary)
+            subprocess.run(['git', 'init', '-q', str(probe)], check=True, capture_output=True)
+            (probe / '.opencode/evidence').mkdir(parents=True)
+            (probe / '.gitignore').write_bytes(current + b'\n/.opencode/evidence/\n')
+            (probe / '.opencode/.gitignore').write_bytes(nested.read_bytes())
+            result = subprocess.run(['git', '-C', str(probe), 'check-ignore', '--no-index',
+                                     '-q', '--', '.opencode/evidence/'], capture_output=True)
+            if result.returncode:
+                raise ValueError('Nested ignore rule exposes .opencode/evidence; reconcile it explicitly before updating; no files changed')
+    return subprocess.run(['git', '-C', str(target), 'check-ignore', '--no-index',
+                           '-q', '--', '.opencode/evidence/__newoc_ignore_probe__'],
+                          capture_output=True).returncode == 0
 
 
 def instruction_update(target, old):
@@ -121,7 +191,16 @@ def update(target, apply=False):
         raise ValueError('Refusing symlink scaffold metadata')
     if (target / '.opencode/.worker.lock').exists():
         raise ValueError('A worker lock exists; reconcile the active run before updating')
+    if not (target / MANIFEST).exists():
+        return legacy_update(target, apply)
     old = json.loads((target / MANIFEST).read_text())
+    if (not isinstance(old, dict) or not isinstance(old.get('version'), str) or
+            not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', old['version']) or
+            not isinstance(old.get('files'), dict) or any(
+                not isinstance(path, str) or Path(path).is_absolute() or '..' in Path(path).parts or
+                not isinstance(value, str) or not re.fullmatch(r'[a-f0-9]{64}', value)
+                for path, value in old.get('files', {}).items())):
+        raise ValueError('Invalid scaffold manifest version/files; restore valid ownership metadata, no files changed')
     if tuple(map(int, old['version'].split('.'))) > tuple(map(int, VERSION.split('.'))):
         raise ValueError('Refusing an implicit downgrade; use a reviewed migration')
     if old['version'].split('.')[0] != VERSION.split('.')[0]:
@@ -159,6 +238,13 @@ def update(target, apply=False):
     instruction_change, starter, backup, instruction_status = instruction_update(target, old)
     if instruction_change is not None:
         changes.append(instruction_change)
+    ignore_path = target / '.gitignore'
+    safe_update_destination(target, ignore_path)
+    ignore = ignore_path.read_bytes() if ignore_path.exists() else b''
+    ignored = evidence_ignore_status(target)
+    if not ignored or not {b'.opencode/evidence/', b'/.opencode/evidence/'} & set(ignore.splitlines()):
+        separator = b'\n' if ignore and not ignore.endswith(b'\n') else b''
+        changes.append((ignore_path, ignore + separator + b'/.opencode/evidence/\n'))
     print(f'Scaffold {old["version"]} -> {VERSION}: {len(changes)} file changes; '+('applying' if apply else 'preview only'), file=sys.stderr)
     for destination, data in changes:
         print(f'  {destination.relative_to(target)}', file=sys.stderr)
@@ -170,10 +256,64 @@ def update(target, apply=False):
             if not backup_path.exists():
                 with backup_path.open('xb') as stream:
                     stream.write(previous)
-        for destination, data in changes:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(data)
-        (target / MANIFEST).write_text(json.dumps(manifest(contents, project_owned, starter), indent=2)+'\n')
+        changes.append((target / MANIFEST, (json.dumps(manifest(contents, project_owned, starter), indent=2)+'\n').encode()))
+        apply_files(target, changes)
+    return target.resolve()
+
+
+def legacy_update(target, apply=False):
+    from legacy import plan
+    defaults = json.loads((TEMPLATE / 'opencode.json').read_text())
+    contents = {path.relative_to(TEMPLATE): path.read_bytes() for path in template_files()
+                if managed(path.relative_to(TEMPLATE))}
+    catalog = json.loads((TEMPLATE.parent / 'legacy-history/native-v3.json').read_text())
+    writes, project_owned, overrides, messages = plan(target, contents, catalog, defaults, safe_update_destination)
+    validate_overrides(target, defaults, overrides)
+    starter = None
+    instruction_path = target / INSTRUCTIONS
+    safe_update_destination(target, instruction_path)
+    if not instruction_path.exists():
+        writes[INSTRUCTIONS] = (TEMPLATE / INSTRUCTIONS).read_text().replace('{{PROJECT_NAME}}', target.name).encode()
+        starter = {'sha256': digest(writes[INSTRUCTIONS]), 'project_name': target.name}
+    ignore_path = target / '.gitignore'
+    safe_update_destination(target, ignore_path)
+    ignore = ignore_path.read_bytes() if ignore_path.exists() else b''
+    ignored = evidence_ignore_status(target)
+    if not ignored or not {b'.opencode/evidence/', b'/.opencode/evidence/'} & set(ignore.splitlines()):
+        writes[Path('.gitignore')] = ignore + (b'\n' if ignore and not ignore.endswith(b'\n') else b'') + b'/.opencode/evidence/\n'
+    contents = {path: data for path, data in contents.items() if str(path) not in project_owned}
+    writes[MANIFEST] = (json.dumps(manifest(contents, project_owned, starter), indent=2)+'\n').encode()
+    originals = {}
+    for relative, data in writes.items():
+        path = target / relative
+        safe_update_destination(target, path)
+        if path.exists() and path.read_bytes() != data:
+            originals[str(relative)] = path.read_bytes()
+    identity = digest(json.dumps({name: digest(data) for name, data in sorted(originals.items())}).encode())
+    backup_root = target / '.opencode/scaffold-backups' / ('legacy-' + identity)
+    backups = []
+    backup_ignore = backup_root / '.gitignore'
+    safe_update_destination(target, backup_ignore)
+    if backup_ignore.exists() and backup_ignore.read_bytes() != b'*\n':
+        raise ValueError('Legacy migration backup ignore collision; no files changed')
+    # Recovery copies remain ignored even if the project's root-ignore write
+    # fails and rollback restores a root file without an evidence rule.
+    backups.append((backup_ignore, b'*\n'))
+    for name, data in originals.items():
+        path = backup_root / 'files' / name
+        safe_update_destination(target, path)
+        if path.exists() and path.read_bytes() != data:
+            raise ValueError('Legacy migration backup collision; no files changed')
+        backups.append((path, data))
+    print(f'Legacy native scaffold -> {VERSION}: '+('applying' if apply else 'preview only'), file=sys.stderr)
+    for message in messages:
+        print('  ' + message, file=sys.stderr)
+    for relative in sorted(writes):
+        print('  ' + str(relative), file=sys.stderr)
+    print('  Preserve AGENTS.md, README, source, Git history and unrelated files; originals backed up locally on apply', file=sys.stderr)
+    if apply:
+        apply_files(target, backups, new_mode=0o600)
+        apply_files(target, [(target / path, data) for path, data in writes.items()])
     return target.resolve()
 
 
@@ -186,6 +326,7 @@ def scaffold(target: Path, name: str, *, existing: bool) -> Path:
     elif target.exists():
         raise ValueError(f'Project already exists: {target}; use --here to add agent files safely')
     target = target.absolute()
+    evidence_ignored = evidence_ignore_status(target)
     validate_overrides(target, json.loads((TEMPLATE/'opencode.json').read_text()))
     files = template_files()
     if not files:
@@ -211,6 +352,8 @@ def scaffold(target: Path, name: str, *, existing: bool) -> Path:
             if relative == Path('.gitignore') and destination.is_file():
                 current_lines = destination.read_text().splitlines()
                 ignore_additions = [line for line in content.splitlines() if line and line not in current_lines]
+                if not evidence_ignored and '.opencode/evidence/' not in ignore_additions:
+                    ignore_additions.append('/.opencode/evidence/')
                 continue
             raise ValueError(f'Refusing to overwrite: {destination}')
         writes.append((destination, content))
@@ -258,9 +401,12 @@ def main():
             parser.error('--update takes no name or --here')
         try:
             print(update(Path.cwd(), args.apply))
-        except (OSError, ValueError, KeyError, TypeError) as error:
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
             print(f'newoc: {error}', file=sys.stderr)
             return 1
+        except KeyboardInterrupt:
+            print('newoc: Update interrupted; completed project writes rolled back', file=sys.stderr)
+            return 130
         return 0
     if args.here:
         if args.name:

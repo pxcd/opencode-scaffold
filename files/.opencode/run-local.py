@@ -16,6 +16,27 @@ ARBITER_MODEL = 'openai/gpt-6.1-sol'
 HELPERS = ('compaction', 'title', 'summary')
 
 
+def verified_session(root, env, session_id=None):
+    """Bind and verify the native session location before submitting any task."""
+    command = ['opencode', 'api', '--standalone']
+    if session_id:
+        command += ['session.get', '--param', 'sessionID=' + session_id]
+    else:
+        command += ['session.create', '--data', json.dumps({
+            'location': {'directory': str(root)}, 'agent': 'Arbiter',
+            'model': {'providerID': 'openai', 'id': 'gpt-6.1-sol'}})]
+    result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError('Native session discovery failed; no task submitted')
+    session = json.loads(result.stdout)['data']
+    directory = session.get('location', {}).get('directory')
+    if not directory or not Path(directory).is_absolute() or Path(directory).resolve() != root:
+        raise ValueError(f'Session {session.get("id")} has an unsuitable repository root; no task submitted')
+    if session.get('agent') != 'Arbiter':
+        raise ValueError('Resume requires an Arbiter session; no task submitted')
+    return session['id']
+
+
 def routing(root):
     native = json.loads((root / 'opencode.json').read_text())
     overrides = validate_overrides(root, native)
@@ -85,9 +106,9 @@ def main():
             '--file', str(task),
             'Own the attached task through native local delegation, recovery, fresh Overlord QA and Sentry code review. Codex intervention is optional. Preserve project acceptance and authorization boundaries; return evidence.',
         ]
-        if args.session:
-            command += ['--session', args.session]
         if not args.doctor and not args.execute:
+            if args.session:
+                command += ['--session', args.session]
             print(json.dumps({'cwd': str(root), 'argv': command, 'runtime_config': config,
                               'note': 'Preview only. Arbiter/Sentry use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
             return 0
@@ -104,7 +125,14 @@ def main():
             stream.write(json.dumps({'pid': os.getpid(), 'role': args.role, 'task': str(task)}) + '\n')
         try:
             run_id = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8]
-            log = evidence / f'{run_id}-{args.role}-{"doctor" if args.doctor else "run"}.log'
+            run_evidence = evidence / run_id
+            run_evidence.mkdir()
+            log = run_evidence / f'{args.role}-{"doctor" if args.doctor else "run"}.log'
+            if args.execute:
+                session_id = verified_session(root, env, args.session)
+                command += ['--session', session_id]
+                (run_evidence / 'handoff.json').write_text(json.dumps({
+                    'sessionID': session_id, 'directory': str(root), 'task': str(task)}, indent=2) + '\n')
             print(f'{"Discovery" if args.doctor else "OpenCode Arbiter"}: {log}', flush=True)
             with log.open('x') as stream:
                 result = subprocess.run(command, cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)

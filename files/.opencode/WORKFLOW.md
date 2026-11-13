@@ -85,6 +85,23 @@ this is not proof of machine-global/session settings or endpoint locality. Nativ
 instructions are policy rather than an OS sandbox. Inspect effective routing when
 there is a concrete mismatch; do not repeat broad preflight inventories each turn.
 
+## Repository scope
+
+Apply the session repository boundary in `.opencode/BASELINE.md` to Arbiter and
+all children. Confirm the recorded absolute session directory and resolved
+repository root before work, pass that root and a repo-local evidence directory
+in every handoff, and confirm each child's recorded directory before its task.
+Never submit/resume a task in an unsuitable checkout or silently move its session.
+A Codex handoff does not select a Codex worktree. External checkout/worktree,
+historical-evidence access and directory changes require explicit scoped user
+authorization. Arrange approvals before unattended batches; unexpected access
+requirements produce a preserved checkpoint, never a permission bypass.
+Keep useful raw findings/logs under `.opencode/evidence/<task>/`; routine chat
+needs no file. Never force-add evidence or include it in shipment scope; source
+and intentional deliverable documentation still use normal project paths.
+Keep machine provider/auth and native session data in their normal
+stores, separate from project evidence. Do not copy or relocate old evidence.
+
 ## Native task loop
 
 1. Confirm absolute checkout, dirty state, issue
@@ -98,7 +115,8 @@ there is a concrete mismatch; do not repeat broad preflight inventories each tur
    route presentation to probe. A view filename does not imply presentation-only.
    For mixed work, establish the interface with SCV before presentation changes.
 3. One implementation writer per checkout. Concurrent writes require isolated
-   worktrees and explicit integration ownership; worktrees do not isolate models.
+   worktrees and explicit integration ownership; creating an external worktree
+   first requires scoped user authorization. Worktrees do not isolate models.
    Verify native session directories rather than trusting prompts to change cwd.
 4. At a worker checkpoint, inspect the actual diff and executed check output.
    Resume a healthy native child session only for related bounded work. Repeated
