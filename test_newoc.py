@@ -28,11 +28,17 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotEqual(subprocess.run(['git','-C',str(p),'rev-parse','HEAD'],capture_output=True).returncode,0)
         for role in ['Arbiter','SCV','Overlord','probe','Sentry']:
             self.assertEqual((p/f'.opencode/agents/{role}.md').read_bytes(),(HERE/f'files/.opencode/agents/{role}.md').read_bytes())
-        self.assertIn('# example engineering instructions',(p/'AGENTS.md').read_text())
+        self.assertIn('# example project instructions',(p/'AGENTS.md').read_text())
+        manifest=json.loads((p/'.opencode/scaffold.json').read_text())
+        self.assertNotIn('AGENTS.md',manifest['files'])
+        self.assertEqual(manifest['starters']['AGENTS.md']['sha256'],
+                         hashlib.sha256((p/'AGENTS.md').read_bytes()).hexdigest())
+        self.assertIn('.opencode/BASELINE.md',manifest['files'])
         self.assertFalse((p/'Sources').exists())
         self.assertTrue((p/'.opencode/agents/Arbiter.md').exists())
         config=json.loads((p/'opencode.json').read_text())
         self.assertEqual(config['default_agent'],'Arbiter')
+        self.assertIn('.opencode/BASELINE.md',config['instructions'])
         self.assertEqual(config['agents']['Arbiter']['model'],'openai/gpt-6.1-sol')
         self.assertIn('mode: primary',(p/'.opencode/agents/Arbiter.md').read_text())
         for role in ['SCV','probe','Overlord']:
@@ -319,7 +325,7 @@ class ScaffoldTests(unittest.TestCase):
         instructions=p/'AGENTS.md';fresh=instructions.read_text()
         self.assertNotIn('Status:',fresh)
         self.assertNotIn('- Project purpose:',fresh)
-        self.assertIn('Preserve existing tracked and untracked work',fresh)
+        self.assertIn('Preserve existing tracked and untracked work',(p/'.opencode/BASELINE.md').read_text())
         bin_dir=self.root/'bin';bin_dir.mkdir();marker=self.root/'spawned'
         cli=bin_dir/'opencode'
         cli.write_text('#!/bin/sh\nprintf reached > "$USABLE_TEST_MARKER"\n');cli.chmod(0o755)
@@ -374,7 +380,8 @@ class ScaffoldTests(unittest.TestCase):
         backup=deploy(HERE,destination,True)
         self.assertEqual((backup/'custom').read_text(),'keep previous')
         self.assertEqual((destination/'TEMPLATE_VERSION').read_text(),(HERE/'TEMPLATE_VERSION').read_text())
-        smoke=subprocess.run(['python3.12','-m','unittest','test_newoc.ScaffoldTests.test_new_project'],
+        smoke=subprocess.run(['python3.12','-m','unittest','test_newoc.ScaffoldTests.test_new_project',
+                              'test_newoc.ScaffoldTests.test_update_recognizes_legacy_starter_and_keeps_backup'],
                              cwd=destination,capture_output=True,text=True)
         self.assertEqual(smoke.returncode,0,smoke.stderr)
         link=self.root/'link';link.symlink_to(destination,target_is_directory=True)
@@ -495,9 +502,98 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(project['agents']['compaction']['model'],{'providerID':'openai','model':'project-helper'})
         self.assertIn('POLICY.md',project['instructions'])
         self.assertIn('.opencode/WORKFLOW.md',defaults['instructions'])
+        self.assertIn('.opencode/BASELINE.md',defaults['instructions'])
         serialized=json.dumps([defaults['plugins'],project['plugins']])
         self.assertIn('project-hook',serialized);self.assertIn('step-limit-compat',serialized)
         self.assertEqual(self.run_tool('--update','--apply',cwd=p).returncode,0)
         self.assertEqual(json.loads((p/'.opencode/opencode.json').read_text()),overrides)
+
+    def test_update_recognizes_legacy_starter_and_keeps_backup(self):
+        self.assertEqual(self.run_tool('renamed','--root',str(self.root)).returncode,0)
+        p=self.root/'renamed';agents=p/'AGENTS.md';m=p/'.opencode/scaffold.json'
+        old=(HERE/'starter-history/AGENTS-4.0.0.md').read_text().replace('{{PROJECT_NAME}}','original-name').encode()
+        agents.write_bytes(old)
+        data=json.loads(m.read_text());data.pop('starters');data['version']='4.0.2';m.write_text(json.dumps(data))
+        before={str(f.relative_to(p)):f.read_bytes() for f in p.rglob('*') if f.is_file() and '.git' not in f.parts}
+        r=self.run_tool('--update',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('replaced untouched generated starter',r.stderr)
+        self.assertEqual(before,{str(f.relative_to(p)):f.read_bytes() for f in p.rglob('*') if f.is_file() and '.git' not in f.parts})
+        r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('# original-name project instructions',agents.read_text())
+        backup=p/'.opencode/evidence/scaffold-updates'/('AGENTS-'+hashlib.sha256(old).hexdigest()+'.md')
+        self.assertEqual(backup.read_bytes(),old)
+        record=json.loads(m.read_text())['starters']['AGENTS.md']
+        self.assertEqual(record,{'sha256':hashlib.sha256(agents.read_bytes()).hexdigest(),'project_name':'original-name'})
+        r=self.run_tool('--update',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertIn('0 file changes',r.stderr)
+
+    def test_missing_instructions_are_restored_without_adopting_custom_rules(self):
+        self.assertEqual(self.run_tool('missing','--root',str(self.root)).returncode,0)
+        p=self.root/'missing';agents=p/'AGENTS.md';expected=agents.read_bytes()
+        agents.unlink()
+        r=self.run_tool('--update',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertFalse(agents.exists());self.assertIn('created missing file',r.stderr)
+        r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(agents.read_bytes(),expected)
+        custom=b'# Team instructions\nDo not access the production network.\n'
+        agents.write_bytes(custom)
+        for _ in range(2):
+            r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+            self.assertEqual(agents.read_bytes(),custom)
+            record=json.loads((p/'.opencode/scaffold.json').read_text())['starters']['AGENTS.md']
+            self.assertEqual(record['sha256'],hashlib.sha256(expected).hexdigest())
+            self.assertNotEqual(record['sha256'],hashlib.sha256(custom).hexdigest())
+
+    def test_unknown_and_customized_legacy_instructions_are_preserved(self):
+        self.assertEqual(self.run_tool('custom-rules','--root',str(self.root)).returncode,0)
+        p=self.root/'custom-rules';agents=p/'AGENTS.md';m=p/'.opencode/scaffold.json'
+        data=json.loads(m.read_text());data.pop('starters');m.write_text(json.dumps(data))
+        legacy=(HERE/'starter-history/AGENTS-4.0.0.md').read_text().replace('{{PROJECT_NAME}}','custom-rules')
+        for contents in [(legacy+'\nKeep this repo-specific rule.\n').encode(),b'# Human-authored rules\nUse custom checks.\n']:
+            agents.write_bytes(contents)
+            r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+            self.assertEqual(agents.read_bytes(),contents)
+            self.assertIn('preserved customized or unrecognized',r.stderr)
+            self.assertNotIn('starters',json.loads(m.read_text()))
+            self.assertFalse((p/'.opencode/evidence/scaffold-updates').exists())
+
+    def test_recorded_generated_starter_upgrades_without_history_match(self):
+        self.assertEqual(self.run_tool('provenance','--root',str(self.root)).returncode,0)
+        p=self.root/'provenance';agents=p/'AGENTS.md';m=p/'.opencode/scaffold.json'
+        old=b'# Generated starter from an earlier compatible release\n'
+        agents.write_bytes(old);data=json.loads(m.read_text())
+        data['starters']['AGENTS.md']['sha256']=hashlib.sha256(old).hexdigest();m.write_text(json.dumps(data))
+        r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(agents.read_text(),(HERE/'files/AGENTS.md').read_text().replace('{{PROJECT_NAME}}','provenance'))
+
+    def test_starter_backup_symlink_is_refused_before_any_writes(self):
+        self.assertEqual(self.run_tool('backup-link','--root',str(self.root)).returncode,0)
+        p=self.root/'backup-link';agents=p/'AGENTS.md'
+        old=(HERE/'starter-history/AGENTS-4.0.0.md').read_text().replace('{{PROJECT_NAME}}','backup-link').encode()
+        agents.write_bytes(old)
+        outside=self.root/'outside';outside.mkdir();(p/'.opencode/evidence').symlink_to(outside,target_is_directory=True)
+        manifest=(p/'.opencode/scaffold.json').read_bytes()
+        r=self.run_tool('--update','--apply',cwd=p);self.assertNotEqual(r.returncode,0)
+        self.assertEqual(agents.read_bytes(),old);self.assertEqual((p/'.opencode/scaffold.json').read_bytes(),manifest)
+        self.assertFalse(list(outside.iterdir()))
+
+    def test_project_owned_instruction_symlink_is_not_followed_or_replaced(self):
+        self.assertEqual(self.run_tool('linked-rules','--root',str(self.root)).returncode,0)
+        p=self.root/'linked-rules';agents=p/'AGENTS.md';agents.unlink()
+        outside=self.root/'shared-rules';outside.write_bytes(b'# External project rules\n')
+        agents.symlink_to(outside)
+        r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertTrue(agents.is_symlink());self.assertEqual(outside.read_bytes(),b'# External project rules\n')
+        self.assertIn('preserved project-owned symlink',r.stderr)
+
+    def test_managed_baseline_updates_without_rewriting_project_instructions(self):
+        self.assertEqual(self.run_tool('baseline','--root',str(self.root)).returncode,0)
+        p=self.root/'baseline';agents=p/'AGENTS.md';agents.write_bytes(b'# Team policy\nKeep our rules.\n')
+        baseline=p/'.opencode/BASELINE.md';baseline.write_text('previous generated defaults\n')
+        m=p/'.opencode/scaffold.json';data=json.loads(m.read_text())
+        data['files']['.opencode/BASELINE.md']=hashlib.sha256(baseline.read_bytes()).hexdigest();m.write_text(json.dumps(data))
+        r=self.run_tool('--update','--apply',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(agents.read_bytes(),b'# Team policy\nKeep our rules.\n')
+        self.assertEqual(baseline.read_bytes(),(HERE/'files/.opencode/BASELINE.md').read_bytes())
 
 if __name__=='__main__': unittest.main()

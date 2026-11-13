@@ -1,6 +1,7 @@
 # OpenCode Arbiter owns orchestration; Codex intervention is optional
 
-Read root AGENTS.md for the project's commands, invariants, access policy,
+Native configuration loads `.opencode/BASELINE.md` for shared engineering defaults,
+independently of project-owned instructions. Read root AGENTS.md, when present, for the project's commands, invariants, access policy,
 delivery and acceptance. `.opencode/PROJECT.md` holds optional additional
 project references. User instructions
 remain authoritative. Keep handoffs and evidence scoped to the current task.

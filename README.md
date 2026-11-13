@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.0.3
+# Native Sol Arbiter + local OpenCode scaffold 4.1.0
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
@@ -23,8 +23,8 @@ models, applications, inference or project publication are started by setup.
 
 | Layer | Files | Responsibility |
 | --- | --- | --- |
-| Shared orchestration | root `opencode.json`, `.opencode/WORKFLOW.md`, `.opencode/agents/`, launcher and compatibility hook | Updated together; do not edit managed defaults |
-| Project instructions | root `AGENTS.md`, optional `.opencode/PROJECT.md`, README, issue/PR templates, `.gitignore` | Project-owned; existing files are never replaced |
+| Shared orchestration | root `opencode.json`, `.opencode/BASELINE.md`, `.opencode/WORKFLOW.md`, `.opencode/agents/`, launcher and compatibility hook | Updated together; do not edit managed defaults |
+| Project instructions | root `AGENTS.md`, optional `.opencode/PROJECT.md`, README, issue/PR templates, `.gitignore` | Project-owned; customized files are never replaced; untouched generated AGENTS starters can migrate with a backup |
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
@@ -43,8 +43,8 @@ repo defaults. Direct OpenCode therefore needs no ignored profile, launcher or
 Codex connection. Machine-specific model tuning is not bundled; verify it against
 the selected model/runtime rather than importing another project's hooks blindly.
 
-A fresh project receives usable minimum instructions in AGENTS.md. Project-specific
-rules are optional additions; no blank questionnaire, setup session or READY marker
+Every installation loads usable minimum instructions from managed `.opencode/BASELINE.md`,
+independently of project-owned AGENTS.md. Project-specific rules are optional additions; no blank questionnaire, setup session or READY marker
 blocks investigation, implementation or configured worker delegation. The coordinator
 discovers relevant commands from source/scripts/CI and asks only when a specific
 consequential action needs a decision or access the task/repository cannot establish.
@@ -121,20 +121,35 @@ newoc --update --apply               # apply after ownership checks
 ```
 
 Updates refuse managed-file edits, symlinks, active locks, implicit downgrades,
-file removal without migration and cross-major changes. Project-owned contracts,
-README/AGENTS and ignored local routing are never automatically replaced. A reviewed
+file removal without migration and cross-major changes. Customized AGENTS.md, other
+project-owned contracts, README and ignored local routing are preserved. A reviewed
 migration may list customized template paths in manifest `project_owned`; these
 are excluded from automatic updates and must not also appear in managed `files`.
 Keep their rules/models/hooks under project review. Finder `.DS_Store` metadata
 is excluded from generation and updates; legacy metadata ownership is retired
 without deleting the existing file.
 
-### Plug-and-play ownership (4.0.0)
+### Plug-and-play instructions (4.1.0)
 
-New repositories receive AGENTS.md with usable default engineering instructions.
-Existing AGENTS.md files are preserved verbatim by both `--here` and updates. The
-shared workflow is loaded through native config, so project contracts do not need
-copied role descriptions. PROJECT.md is optional additional project context.
+Shared engineering defaults live in managed `.opencode/BASELINE.md`, explicitly
+loaded alongside WORKFLOW.md through native configuration. AGENTS.md is a small,
+stable place for optional project rules; existing project instructions need no
+copied scaffold policy. PROJECT.md is optional additional project context.
+
+`--here` preserves existing AGENTS.md. Updates restore a missing AGENTS.md and can
+refresh an untouched generated starter. New installations record its original hash;
+older installations are recognized only by exact known template bytes, allowing
+only the substituted project name to vary. Customized or unknown files are preserved
+byte-for-byte, and their content is never adopted as a generated starter. Baseline
+updates therefore work even when AGENTS.md contains entirely custom project rules.
+
+Preview reports the AGENTS.md decision without writing anything. Before replacing
+an untouched starter, apply retains its original bytes at
+`.opencode/evidence/scaffold-updates/AGENTS-<sha256>.md`. Backup collisions and unsafe
+paths fail before managed files change. `starter-history/` contains immutable old
+starter templates for recognition and ships with separate starter deployments;
+it is not copied into projects. No deletion, setup wizard or readiness marker is
+needed for same-major upgrades. Cross-major/layout changes still require review.
 
 OpenCode 2.2.7 loads root `opencode.json` before `.opencode/opencode.json`. The root
 file contains scaffold defaults, including role models, steps and permissions.
