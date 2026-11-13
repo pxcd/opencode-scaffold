@@ -229,6 +229,46 @@
         },
         {
           "action": "shell",
+          "resource": "git push origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -u origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push --set-upstream origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/* *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\t*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\n*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\r*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*:*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
           "resource": "git push*--force*",
           "effect": "deny"
         },
@@ -352,6 +392,46 @@
         {
           "action": "shell",
           "resource": "git push*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -u origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push --set-upstream origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/* *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\t*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\n*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\r*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*:*",
           "effect": "ask"
         },
         {

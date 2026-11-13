@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Arbiter + local OpenCode scaffold, version 4.0.3.
+Created with the native Sol Arbiter + local OpenCode scaffold, version 4.1.1.
 
 Open the repo in OpenCode and use GPT-6.1 Sol normally. Desktop's `build` primary
 entry is configured as the Arbiter coordinator, with the same shared policy and
@@ -10,7 +10,8 @@ It owns delegation, checkpoints, recovery and fresh independent QA through local
 SCV/probe/Overlord subagents, followed by fresh Sentry code review on Sol. Codex is an optional upper-level advisor, not a
 resident supervisor. Direct OpenCode use needs no Codex chat or launcher.
 
-AGENTS.md contains usable engineering defaults immediately. Add project-specific
+Managed `.opencode/BASELINE.md` supplies usable engineering defaults immediately;
+AGENTS.md is for optional project rules. Add project-specific
 commands, architecture, invariants or references later when helpful. Existing
 instructions are preserved; no setup session or READY marker is required.
 The coordinator discovers relevant scripts/tests/CI as part of the requested task
@@ -34,8 +35,9 @@ rules stay separate. `newoc --update` previews same-major updates and `--apply`
 opts in only if managed files remain unchanged. Major-version migrations require
 reviewing project-owned instructions as well. Existing projects never auto-sync.
 
-AGENTS.md, project config overrides and optional PROJECT.md are never overwritten
-by setup over an existing file or scaffold updates. Keep shared role policy in the
+Customized AGENTS.md, project config overrides and optional PROJECT.md are preserved.
+Updates may refresh an untouched generated AGENTS.md starter with a backup, or
+restore a missing starter; shared BASELINE.md updates independently. Keep shared role policy in the
 managed workflow/agents. Native config loads scaffold defaults before project
 overrides; no launcher is required. Stricter role permissions belong in
 `agents.<role>.permissions`, because native role rules follow global rules.

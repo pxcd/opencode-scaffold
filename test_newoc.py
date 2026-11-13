@@ -1,4 +1,5 @@
 import hashlib
+from fnmatch import fnmatchcase
 import json
 import os
 from pathlib import Path
@@ -46,17 +47,38 @@ class ScaffoldTests(unittest.TestCase):
             self.assertTrue(config['agents'][role]['model'].startswith('lmstudio/'))
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
         self.assertFalse(list(p.rglob('__pycache__')))
-    def test_publication_requires_coordinator_approval(self):
+    def test_coordinator_push_permissions_are_scoped_to_single_feature_branch(self):
         config=json.loads((HERE/'files/opencode.json').read_text())
-        self.assertIn({'action':'shell','resource':'git push*','effect':'deny'},config['permissions'])
-        def permissions(role):
-            return config['agents'][role]['permissions']
-        shell=[p for p in permissions('Arbiter') if p['action']=='shell']
-        self.assertEqual([p for p in shell if p['effect']=='ask'],[{'action':'shell','resource':'git push*','effect':'ask'}])
-        for resource in ['git push*--force*','git push -f*','git push* -f*','git push* +*','git push*--mirror*','git push*--delete*','git push* :*']:
-            self.assertIn({'action':'shell','resource':resource,'effect':'deny'},shell)
-        for role in ['SCV','probe','Overlord']:
-            self.assertFalse(any(p['action']=='shell' for p in permissions(role)))
+        def decision(role, command):
+            result=None
+            for rule in [*config['permissions'], *config['agents'][role].get('permissions',[])]:
+                if fnmatchcase('shell',rule['action']) and fnmatchcase(command,rule['resource']):
+                    result=rule['effect']
+            return result
+        allowed=['git push origin codex/task','git push -u origin codex/task',
+                 'git push --set-upstream origin codex/task', 'git push origin codex/nested/task']
+        guarded=['git push','git push origin main','git push origin master',
+                 'git push -u origin main','git push upstream codex/task',
+                 'git push origin HEAD','git push origin codex/task main',
+                 'git push origin codex/task codex/other','git push origin codex/task --all',
+                 'git push origin codex/task\tmain','git push origin codex/task\nmain',
+                 'git push origin codex/task\rmain',
+                 'git push origin codex/task:main','git push origin codex/task:refs/heads/main',
+                 'git push --all origin','git push --tags origin']
+        denied=['git push --force origin codex/task','git push origin codex/task --force-with-lease',
+                'git push -uf origin codex/task','git push -f origin codex/task',
+                'git push origin +codex/task','git push --mirror origin',
+                'git push --delete origin codex/task','git push -d origin codex/task',
+                'git push origin :codex/task']
+        for role in ['Arbiter','build']:
+            for effect,commands in [('allow',allowed),('ask',guarded),('deny',denied)]:
+                for command in commands:
+                    with self.subTest(role=role,command=command):
+                        self.assertEqual(decision(role,command),effect)
+        for role in ['SCV','probe','Overlord','Sentry','title','summary','compaction']:
+            for command in allowed:
+                with self.subTest(role=role,command=command):
+                    self.assertEqual(decision(role,command),'deny')
 
     def test_desktop_entry_uses_bounded_coordinator_defaults(self):
         config=json.loads((HERE/'files/opencode.json').read_text())

@@ -31,9 +31,10 @@ supported; the launcher is only an optional handoff/diagnostic entry point.
 Arbiter and Sentry are routed to cloud GPT-6.1 Sol.
 SCV, probe and Overlord remain local;
 maintenance helpers remain local unless the project contract explicitly authorizes
-other helper routes. Check model/provider registrations, effective configuration
-and project plugins before inference; a provider ID alone does not prove a local
-endpoint. Do not install software, reconfigure providers or start competing GPU
+other helper routes. Provider registration, endpoint locality and plugin review
+belong to installation or an explicit routing change/diagnostic. For routine tasks,
+use the loaded native roles and configured routes; a provider ID alone is not
+independent proof of endpoint locality. Do not install software, reconfigure providers or start competing GPU
 workloads without authorization. Configuration discovery does not run inference.
 
 ## Task entry and discovery
@@ -42,11 +43,27 @@ A fresh scaffold is usable immediately. There is no onboarding session, complete
 questionnaire or READY marker required before investigation, implementation or
 native worker delegation. Project-specific instructions can be added later.
 
-Confirm the actual checkout and coordinator configuration: Desktop `build` and
-explicit `Arbiter` are both valid primary entries when they load the shared policy,
-Sol route and bounded native delegation. A missing/misrouted coordinator is a
-concrete configuration problem; report it rather than bypassing tool permissions.
-Workers confirm their own assigned role and location, not a primary Arbiter ID.
+Start with the actual cwd, branch, dirty status and task-scoped diff, then read
+only applicable project rules and relevant scripts/CI. Desktop `build` and explicit
+`Arbiter` are both valid primary entries. Use native subagent calls directly;
+ordinary repository work does not require rediscovering OpenCode itself. For a
+committed documentation-only shipment, dispatch Overlord once scope and relevant
+gates are known; no implementation worker is needed.
+
+Do not inspect API schemas, enumerate runtime configuration/providers, load the
+OpenCode skill, inventory processes or query historical sessions as routine startup.
+Investigate those only for an observed routing/tool/transport failure, a concrete
+competing-run signal or an explicit OpenCode task. Check only the implicated state;
+a historical task note alone does not require a session-history audit. Workers
+confirm their own assigned role and location, not a primary Arbiter ID.
+
+Keep tool output bounded: use scoped diff/stat, targeted search and selected JSON
+fields. Do not dump all tracked paths, entire configs or large logs. Save long gate
+output in project-local evidence and read relevant tails/sections. If output was
+truncated, rerun a narrower read rather than opening external shell-cache files.
+Read each unchanged fact once per decision; independent QA still gathers its own
+evidence. Revalidate branch/head/base and PR gates before consequential publication,
+merge and cleanup, not on every reasoning turn.
 
 Read existing project instructions and honor substantive access, invariants and
 acceptance rules. Legacy scaffold Status: READY/UNCONFIGURED markers and empty
@@ -128,8 +145,8 @@ release/develop branch hierarchy. Useful checkpoints are appropriate for longer 
    checks and obtain fresh QA/review after source changes. Record the actual
    review with the repository's existing helper when available; never invent a
    passing check, impersonate human approval or assume every repo has a review gate.
-3. Wait for required CI/review checks, resolve discussions and complete required
-   human acceptance. If integration with the default branch changes the PR head,
+3. Wait for required CI/review checks, resolve discussions and complete applicable
+   human acceptance as defined below. If integration with the default branch changes the PR head,
    repeat relevant verification and review. Follow the repository's exact receipt
    invalidation policy; no earlier-head approval applies to later code.
 4. With explicit merge authorization, squash-merge the PR on the host when the
@@ -153,9 +170,26 @@ release/develop branch hierarchy. Useful checkpoints are appropriate for longer 
 Authorization is scoped: commit/push does not authorize merging; opening a PR does
 not authorize merging either. Explicit commit/push/merge authorization includes
 routine cleanup of that completed branch, subject to the checks above. "Ship it"
-has that meaning only when explicitly established for the project/task. Stop for
+means the full commit/push/PR/merge/verification/cleanup flow in this scaffold,
+unless the user or project narrows it. Stop for
 failed gates, unresolved findings, missing required human acceptance or genuine
 permissions; do not repeatedly ask for routine steps already authorized.
+Human acceptance must name an affected criterion: for example microphone/device
+behavior, visual quality or a product decision that automated QA cannot establish.
+If no affected manual criterion applies and QA/review/required checks pass, existing
+shipping/merge authorization is sufficient; do not ask for a second generic approval.
+A documentation-only change does not automatically require app/device testing.
+Honor explicit project rules requiring owner approval for every PR or a separately
+required sign-off; do not silently weaken them or mark unperformed manual checks as
+passed. State the exact outstanding criterion and source when stopping.
+
+Native coordinator permissions preapprove only an explicit single `codex/*` branch
+push to `origin`, optionally with `-u` or `--set-upstream`. Use that canonical form
+only after task authorization and confirming the target is a feature branch, not
+the repository's default/protected branch. Other push forms, destinations, multiple
+refs and colon refspecs still ask; force/mirror pushes and remote-ref deletion remain
+denied. Workers/helpers cannot push. A stricter project permission can still ask or
+deny. Never rewrite a guarded command to evade its approval; report a genuine gate.
 Configuration is policy, not authorization or proof of host enforcement.
 
 ## Boundaries and evidence

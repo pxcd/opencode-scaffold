@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.1.0
+# Native Sol Arbiter + local OpenCode scaffold 4.1.1
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
@@ -228,9 +228,9 @@ without sourcing unrelated startup. Native discovery is configuration evidence,
 not sustained live Sol-to-local orchestration acceptance. Run a deliberate small
 smoke task when inference is authorized and GPU capacity is available.
 
-## Publication permission policy (3.0.1)
+## Publication and acceptance policy (4.1.1)
 
-Shared configuration denies Git pushes for workers and helpers. Only the coordinator (Arbiter or its Desktop build entry) can request native approval for an ordinary push, after explicit task authorization. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Existing projects require an explicit reviewed update.
+Shared configuration denies Git pushes for workers and helpers. Only the coordinator (Arbiter or its Desktop build entry) preapproves canonical single-branch pushes to `origin/codex/*`, optionally with `-u` or `--set-upstream`, after explicit task authorization. Other destinations/forms, multiple refs and colon refspecs still ask; the agent must verify the target is not the default/protected branch. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Explicit shipping authorization covers delivery through merge when QA, review and required checks pass; human acceptance is required for affected manual criteria or explicit project sign-off rules, not a generic second approval. Existing project rules are never rewritten. Routine startup uses bounded repository inspection and native delegation; runtime/provider discovery is reserved for concrete failures or explicit diagnostics. Existing projects require an explicit reviewed update.
 
 
 ## Sentry code review (3.1.0)
