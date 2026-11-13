@@ -47,8 +47,8 @@ def validate_overrides(target, defaults):
             mode = 'primary' if role in coordinators else 'subagent'
             if custom.get('disabled') or custom.get('mode', mode) != mode:
                 raise ValueError(f'Project override disables or changes required role {role}')
-        if role == 'build' and 'system' in custom and custom['system'] != shared['system']:
-            raise ValueError('Project build system override conflicts with the shared coordinator policy')
+        if role in coordinators and 'system' in custom and custom['system'] != defaults['agents']['build']['system']:
+            raise ValueError(f'Project {role} system override conflicts with the shared coordinator policy; move project constraints to project-owned AGENTS.md, PROJECT.md or native instructions before updating')
         rules = custom.get('permissions', [])
         if not isinstance(rules, list):
             raise ValueError(f'Project {role} permissions must be a list')

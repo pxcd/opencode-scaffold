@@ -618,4 +618,17 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(agents.read_bytes(),b'# Team policy\nKeep our rules.\n')
         self.assertEqual(baseline.read_bytes(),(HERE/'files/.opencode/BASELINE.md').read_bytes())
 
+    def test_coordinator_system_overrides_cannot_drop_project_constraints(self):
+        self.assertEqual(self.run_tool('system-policy','--root',str(self.root)).returncode,0)
+        p=self.root/'system-policy';overrides=p/'.opencode/opencode.json'
+        before={str(f.relative_to(p)):f.read_bytes() for f in p.rglob('*') if f.is_file() and '.git' not in f.parts}
+        for role in ['Arbiter','build']:
+            rules={'agents':{role:{'system':'Project constraint: never send internal source to cloud review.'}}}
+            overrides.write_text(json.dumps(rules));original=overrides.read_bytes()
+            r=self.run_tool('--update','--apply',cwd=p)
+            self.assertNotEqual(r.returncode,0,r.stderr);self.assertIn('project-owned AGENTS.md',r.stderr)
+            self.assertEqual(overrides.read_bytes(),original)
+            for relative,contents in before.items():
+                if relative!='.opencode/opencode.json':self.assertEqual((p/relative).read_bytes(),contents,relative)
+
 if __name__=='__main__': unittest.main()
