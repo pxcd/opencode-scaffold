@@ -318,6 +318,105 @@
           "effect": "deny"
         }
       ]
+    },
+    "build": {
+      "model": "openai/gpt-6.1-sol",
+      "steps": 80,
+      "permissions": [
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "SCV",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "Overlord",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "probe",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "Sentry",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--force*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -f*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -f*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -uf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -qf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -vf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* +*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--mirror*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--delete*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* :*",
+          "effect": "deny"
+        }
+      ],
+      "mode": "primary",
+      "description": "Desktop entry for the scaffold coordinator",
+      "system": "{file:.opencode/agents/Arbiter.md}"
     }
   },
   "model": "openai/gpt-6.1-sol",

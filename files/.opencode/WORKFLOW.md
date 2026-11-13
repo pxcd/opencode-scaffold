@@ -14,6 +14,12 @@ fresh Sentry performs final cloud code review. All subagents cannot delegate fur
 Arbiter can launch only SCV, probe, Overlord and Sentry as native subagents.
 Keep local inference sequential by default.
 
+The coordinator has two supported primary entry IDs: `build`, used by the normal
+Desktop composer, and `Arbiter`, used by explicit CLI/API selection. Both load the
+same Arbiter policy and bounded delegation rules. The default named agent remains
+Arbiter. Model selection alone is not proof of routing, but Desktop users do not
+need an @mention, hidden picker or additional command to invoke this policy.
+
 Codex sits above Arbiter for optional task definition, architecture advice,
 concrete escalation and final evidence review. Arbiter must be able to execute
 an authorized task end-to-end without Codex polling, routine checkpoint approval
@@ -35,10 +41,12 @@ Configuration discovery and read-only contract preparation may run before the
 project is ready. Before implementation, verification for delivery, worker dispatch,
 commits, pushes or PR/merge actions, establish both of the following:
 
-- The actual primary session agent is **Arbiter**, not merely a Sol model or a
-  configured default. Existing sessions may retain `build` or another agent after
-  scaffold installation. If the active primary role is wrong or cannot be confirmed,
-  stop with the exact next action: select Arbiter (or open a new Arbiter session).
+- The actual primary session is a configured coordinator: `build` or `Arbiter`,
+  running the shared Arbiter policy on Sol with native SCV/probe/Overlord/Sentry
+  delegation allowed and other delegation denied. The `build` ID is expected in
+  Desktop and is not itself a startup failure. If the coordinator policy/routing
+  is missing or cannot be confirmed, stop and report that configuration mismatch;
+  do not direct Desktop users to a picker that may not be exposed.
   Do not silently act as coordinator, invoke Arbiter as a child, or work around
   missing delegation through shell/API calls. Child workers verify their own
   assigned role and location; this primary-session check is not a demand that
@@ -50,7 +58,7 @@ commits, pushes or PR/merge actions, establish both of the following:
   missing permissions/acceptance, and finish that setup before resuming the task.
   A marker alone is not evidence that commands or access rules were verified.
 
-Report the confirmed checkout, primary role, branch and readiness before the first
+Report the confirmed checkout, primary entry ID, branch and readiness before the first
 substantive milestone. The optional launcher selects Arbiter explicitly and enforces
 the readiness marker and local project-override compatibility in code; direct
 OpenCode sessions must follow this preflight policy. This policy is not a native

@@ -52,6 +52,18 @@ class ScaffoldTests(unittest.TestCase):
         for role in ['SCV','probe','Overlord']:
             self.assertFalse(any(p['action']=='shell' for p in permissions(role)))
 
+    def test_desktop_entry_uses_bounded_coordinator_defaults(self):
+        config=json.loads((HERE/'files/opencode.json').read_text())
+        desktop=config['agents']['build'];explicit=config['agents']['Arbiter']
+        self.assertEqual(desktop['system'],'{file:.opencode/agents/Arbiter.md}')
+        self.assertEqual(desktop['mode'],'primary')
+        for field in ['model','steps','permissions']:
+            self.assertEqual(desktop[field],explicit[field])
+        self.assertIn({'action':'subagent','resource':'*','effect':'deny'},config['permissions'])
+        for role in ['SCV','probe','Overlord','Sentry']:
+            self.assertIn({'action':'subagent','resource':'*','effect':'deny'},
+                          config['agents'][role]['permissions'])
+
     def test_sentry_is_cloud_read_only_and_dispatchable(self):
         self.assertEqual(self.run_tool('review', '--root', str(self.root)).returncode, 0)
         p = self.root/'review'
@@ -382,6 +394,10 @@ class ScaffoldTests(unittest.TestCase):
                {'agents': {'Overlord': {'disabled':True}}},
                {'agents': {'Sentry': {'disabled':True}}}]
         cases.append({'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]})
+        cases.extend([{'agents':{'build':{'disabled':True}}},
+                      {'agents':{'build':{'model':'lmstudio/wrong'}}},
+                      {'agents':{'build':{'system':'Implement everything yourself'}}},
+                      {'agents':{'Arbiter':{'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]}}}])
         for overrides in cases:
             with self.subTest(overrides=overrides):
                 config.write_text(json.dumps(overrides))
@@ -398,12 +414,13 @@ class ScaffoldTests(unittest.TestCase):
         script=source/'newoc.py';p=self.root/'future-agent'
         r=subprocess.run(['python3.12',str(script),'future-agent','--root',str(self.root)],capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
-        overrides=b'{"agents":{"SCV":{"model":"lmstudio/custom"},"Arbiter":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]}},"instructions":["POLICY.md"],"plugins":["./plugins/project-hook"]}\n'
+        overrides=b'{"agents":{"SCV":{"model":"lmstudio/custom"},"Arbiter":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]},"build":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]}},"instructions":["POLICY.md"],"plugins":["./plugins/project-hook"]}\n'
         (p/'.opencode/opencode.json').write_bytes(overrides)
         (p/'AGENTS.md').write_text('Project-only instructions.\n')
         config=source/'files/opencode.json';defaults=json.loads(config.read_text())
         defaults['agents']['Auditor']={'model':'lmstudio/qa'}
-        defaults['agents']['Arbiter']['permissions'].append({'action':'subagent','resource':'Auditor','effect':'allow'})
+        for entry in ['Arbiter','build']:
+            defaults['agents'][entry]['permissions'].append({'action':'subagent','resource':'Auditor','effect':'allow'})
         config.write_text(json.dumps(defaults,indent=2)+'\n')
         (source/'files/.opencode/agents/Auditor.md').write_text('---\ndescription: Future role\nmode: subagent\n---\nIndependent fixture.\n')
         before=(p/'opencode.json').read_bytes()
@@ -429,12 +446,13 @@ class ScaffoldTests(unittest.TestCase):
                               'compaction': {'model':'openai/project-helper'},
                               'Arbiter': {'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]}},
                    'instructions':['POLICY.md'],'plugins':['./plugins/project-hook']}
+        overrides['agents']['build']={'permissions':overrides['agents']['Arbiter']['permissions']}
         (p/'.opencode/opencode.json').write_text(json.dumps(overrides))
         env={**os.environ,**{f'XDG_{k}_HOME':str(self.root/k.lower()) for k in ['CONFIG','DATA','CACHE','STATE']}}
         for key in ['OPENCODE_CONFIG','OPENCODE_CONFIG_DIR','OPENCODE_CONFIG_CONTENT']:env.pop(key,None)
         r=subprocess.run(['opencode','debug','agents','--standalone'],cwd=p,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
-        agents={a['name']:a for a in json.loads(r.stdout)}
+        agents={a['id']:a for a in json.loads(r.stdout)}
         self.assertEqual(agents['SCV']['model'],{'providerID':'lmstudio','id':'project-worker'})
         self.assertEqual(agents['SCV']['steps'],7)
         for role in ['SCV','probe']:
@@ -442,8 +460,16 @@ class ScaffoldTests(unittest.TestCase):
                 rules=[r for r in agents[role]['permissions'] if r['action']=='edit' and r['resource']==resource]
                 self.assertEqual(rules[-1]['effect'],'deny')
         self.assertEqual(agents['Sentry']['model'],{'providerID':'openai','id':'gpt-6.1-sol'})
-        push=[r for r in agents['Arbiter']['permissions'] if r['action']=='shell' and r['resource']=='git push*']
-        self.assertEqual(push[-1]['effect'],'deny')
+        for coordinator in ['Arbiter','build']:
+            push=[r for r in agents[coordinator]['permissions'] if r['action']=='shell' and r['resource']=='git push*']
+            self.assertEqual(push[-1]['effect'],'deny')
+        self.assertEqual(agents['build']['model'],agents['Arbiter']['model'])
+        self.assertEqual(agents['build']['steps'],agents['Arbiter']['steps'])
+        self.assertIn(agents['Arbiter']['system'].strip(),agents['build']['system'])
+        for coordinator in ['Arbiter','build']:
+            rules=[r for r in agents[coordinator]['permissions'] if r['action']=='subagent']
+            self.assertEqual(rules[-5:],[{'action':'subagent','resource':'*','effect':'deny'},
+                *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['SCV','Overlord','probe','Sentry']]])
         for action in ['edit','shell','execute','subagent','external_directory']:
             rules=[r for r in agents['Sentry']['permissions'] if r['action']==action and r['resource']=='*']
             self.assertEqual(rules[-1]['effect'],'deny')

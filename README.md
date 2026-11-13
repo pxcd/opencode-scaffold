@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.0.1
+# Native Sol Arbiter + local OpenCode scaffold 4.0.2
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
@@ -50,10 +50,12 @@ failures itself. Genuine permissions, unresolved concrete blockers and the agree
 human acceptance/publication gates still go to the user. One execution coordinator
 owns a task; do not run a competing Codex worker loop alongside Arbiter.
 
-Startup preflight lives in the managed shared workflow. Check the selected primary
-session agent, not just its model/default: existing sessions may retain `build`
-after setup. Select Arbiter explicitly and establish the actual project contract
-before delivery work. Read-only discovery/contract preparation is allowed during
+Startup preflight lives in the managed shared workflow. Desktop's normal `build`
+primary entry now loads the Arbiter policy through a native file reference to
+`.opencode/agents/Arbiter.md`; its model, steps and bounded delegation defaults
+match the explicit Arbiter agent. No @mention, custom command or primary-agent
+picker is required. Confirm this effective coordinator setup and establish the
+actual project contract before delivery work. Read-only discovery/contract preparation is allowed during
 setup. Direct OpenCode follows these instructions; this is not a native runtime
 lock. The optional launcher enforces an exact READY marker and uses the same
 project-override compatibility checker as setup/updates, including with local.json.
@@ -149,6 +151,9 @@ Example project-owned `.opencode/opencode.json`:
     "compaction": {"model": "openai/gpt-6.1-sol"},
     "Arbiter": {
       "permissions": [{"action": "shell", "resource": "git push*", "effect": "deny"}]
+    },
+    "build": {
+      "permissions": [{"action": "shell", "resource": "git push*", "effect": "deny"}]
     }
   },
   "instructions": ["docs/engineering-rules.md"],
@@ -161,6 +166,14 @@ instruction paths are repository-relative. Keep provider endpoints/auth machine-
 Cloud helper routes need project authorization; configuration is not authorization.
 Only configure a plugin that actually exists. These examples do not install plugins
 or register models. Native discovery remains necessary after changing overrides.
+
+The two coordinator entry points share one prompt file. Their native JSON default
+permissions/models are kept aligned by regression checks. Mirror any project
+coordinator permission overrides under both `agents.Arbiter` and `agents.build`;
+updates/dispatch stop on asymmetric rules rather than silently changing access.
+This may require a reviewed edit to an existing project's overrides before update;
+the updater never rewrites those overrides. Other subagents retain their existing
+local routes and delegation denials.
 
 Role permissions are evaluated after global permissions: place stricter role rules
 in `agents.<role>.permissions`. The updater refuses recognized shadowed global denies,
@@ -202,7 +215,7 @@ smoke task when inference is authorized and GPU capacity is available.
 
 ## Publication permission policy (3.0.1)
 
-Shared configuration denies Git pushes for workers and helpers. Only Arbiter can request native approval for an ordinary push, after explicit task authorization. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Existing projects require an explicit reviewed update.
+Shared configuration denies Git pushes for workers and helpers. Only the coordinator (Arbiter or its Desktop build entry) can request native approval for an ordinary push, after explicit task authorization. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Existing projects require an explicit reviewed update.
 
 
 ## Sentry code review (3.1.0)

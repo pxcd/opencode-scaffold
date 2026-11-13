@@ -22,6 +22,17 @@ def validate_overrides(target, defaults):
     agents = overrides.get('agents', {})
     if not isinstance(agents, dict):
         raise ValueError('Project agents override must be an object')
+    coordinators = ('Arbiter', 'build')
+    # Both entry points are the same coordinator. Do not silently lose a stricter
+    # project rule when Desktop chooses build instead of the explicit Arbiter role.
+    coordinator_permissions = []
+    for role in coordinators:
+        custom = agents.get(role, {})
+        if not isinstance(custom, dict):
+            raise ValueError(f'Invalid project override for {role}')
+        coordinator_permissions.append(custom.get('permissions', []))
+    if coordinator_permissions[0] != coordinator_permissions[1]:
+        raise ValueError('Mirror coordinator permission overrides in agents.Arbiter.permissions and agents.build.permissions before updating or dispatching')
     global_rules = overrides.get('permissions', [])
     if not isinstance(global_rules, list) or any(
             not isinstance(r, dict) or not all(isinstance(r.get(k), str) for k in ('action', 'resource', 'effect'))
@@ -31,12 +42,14 @@ def validate_overrides(target, defaults):
         custom = agents.get(role, {})
         if not isinstance(custom, dict):
             raise ValueError(f'Invalid project override for {role}')
-        if role in ('Arbiter', 'Sentry') and custom.get('model', shared['model']) != shared['model']:
+        if role in (*coordinators, 'Sentry') and custom.get('model', shared['model']) != shared['model']:
             raise ValueError(f'Project override conflicts with pinned {role} model')
-        if role in ('Arbiter', 'SCV', 'probe', 'Overlord', 'Sentry'):
-            mode = 'primary' if role == 'Arbiter' else 'subagent'
+        if role in (*coordinators, 'SCV', 'probe', 'Overlord', 'Sentry'):
+            mode = 'primary' if role in coordinators else 'subagent'
             if custom.get('disabled') or custom.get('mode', mode) != mode:
                 raise ValueError(f'Project override disables or changes required role {role}')
+        if role == 'build' and 'system' in custom and custom['system'] != shared['system']:
+            raise ValueError('Project build system override conflicts with the shared coordinator policy')
         rules = custom.get('permissions', [])
         if not isinstance(rules, list):
             raise ValueError(f'Project {role} permissions must be a list')
@@ -69,12 +82,12 @@ def validate_overrides(target, defaults):
                 if fnmatchcase(action, rule['action']) and fnmatchcase(resource, rule['resource']):
                     effect = rule['effect']
             return effect
-        if role == 'Arbiter':
+        if role in coordinators:
             children = {r['resource'] for r in shared['permissions']
                         if r['action'] == 'subagent' and r['effect'] == 'allow'}
             for child in sorted(children):
                 if decision('subagent', child) != 'allow':
-                    raise ValueError(f'Project override blocks Arbiter delegation to {child}; reconcile it explicitly')
+                    raise ValueError(f'Project override blocks {role} delegation to {child}; reconcile it explicitly')
         elif role == 'Sentry':
             for action in ('edit', 'shell', 'execute', 'subagent', 'external_directory'):
                 if decision(action, '*') != 'deny':
