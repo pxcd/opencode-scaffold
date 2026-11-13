@@ -24,7 +24,7 @@ def deploy(source, destination, apply=False):
     stage = Path(tempfile.mkdtemp(prefix='.newoc-stage-', dir=destination.parent))
     backup = None
     try:
-        for name in ['files', 'newoc.py', 'newoc.zsh', 'deploy.py', 'test_newoc.py', 'TEMPLATE_VERSION', 'README.md']:
+        for name in ['files', 'starter-history', 'legacy-history', 'legacy.py', 'newoc.py', 'newoc.zsh', 'deploy.py', 'test_newoc.py', 'TEMPLATE_VERSION', 'README.md']:
             src = source / name
             if src.is_dir():
                 shutil.copytree(src, stage / name)

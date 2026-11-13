@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.0.1
+# Native Sol Arbiter + local OpenCode scaffold 4.2.0
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
@@ -23,8 +23,8 @@ models, applications, inference or project publication are started by setup.
 
 | Layer | Files | Responsibility |
 | --- | --- | --- |
-| Shared orchestration | root `opencode.json`, `.opencode/WORKFLOW.md`, `.opencode/agents/`, launcher and compatibility hook | Updated together; do not edit managed defaults |
-| Project contract | root `AGENTS.md`, optional `.opencode/PROJECT.md`, README, issue/PR templates, `.gitignore` | Project-owned; existing files are never replaced |
+| Shared orchestration | root `opencode.json`, `.opencode/BASELINE.md`, `.opencode/WORKFLOW.md`, `.opencode/agents/`, launcher and compatibility hook | Updated together; do not edit managed defaults |
+| Project instructions | root `AGENTS.md`, optional `.opencode/PROJECT.md`, README, issue/PR templates, `.gitignore` | Project-owned; customized files are never replaced; untouched generated AGENTS starters can migrate with a backup |
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
@@ -43,21 +43,23 @@ repo defaults. Direct OpenCode therefore needs no ignored profile, launcher or
 Codex connection. Machine-specific model tuning is not bundled; verify it against
 the selected model/runtime rather than importing another project's hooks blindly.
 
-Complete root AGENTS.md and mark Status: READY before substantive work. Arbiter must honor its privacy,
-network, ownership, build/test and delivery rules. Codex can prepare a handoff,
-give requested advice or review final evidence. Native Sol handles routine worker
-failures itself. Genuine permissions, unresolved concrete blockers and the agreed
-human acceptance/publication gates still go to the user. One execution coordinator
-owns a task; do not run a competing Codex worker loop alongside Arbiter.
+Every installation loads usable minimum instructions from managed `.opencode/BASELINE.md`,
+independently of project-owned AGENTS.md. Project-specific rules are optional additions; no blank questionnaire, setup session or READY marker
+blocks investigation, implementation or configured worker delegation. The coordinator
+discovers relevant commands from source/scripts/CI and asks only when a specific
+consequential action needs a decision or access the task/repository cannot establish.
+Existing project-owned instructions and substantive restrictions are preserved.
+Credentials, private runtime data and unrelated archives are excluded by default.
+Publication and other consequential operations still require task authorization.
+One active execution coordinator owns a task; do not run competing worker loops.
 
-Startup preflight lives in the managed shared workflow. Check the selected primary
-session agent, not just its model/default: existing sessions may retain `build`
-after setup. Select Arbiter explicitly and establish the actual project contract
-before delivery work. Read-only discovery/contract preparation is allowed during
-setup. Direct OpenCode follows these instructions; this is not a native runtime
-lock. The optional launcher enforces an exact READY marker and uses the same
-project-override compatibility checker as setup/updates, including with local.json.
-It does not validate machine-global/session overrides or prove endpoint locality.
+Desktop's normal `build` primary entry loads the Arbiter policy through a native
+file reference to `.opencode/agents/Arbiter.md`; model, steps and bounded delegation
+defaults match the explicit Arbiter agent. No @mention, extra command or primary-agent
+picker is required. Legacy scaffold status markers are not authorization or runtime
+gates. Verify effective routing when there is a concrete mismatch rather than
+repeating broad startup inventories. The optional launcher checks repository config
+compatibility; it does not prove machine-global/session settings or endpoint locality.
 
 ## Optional launcher and evidence
 
@@ -74,6 +76,76 @@ sessions remain Arbiter's responsibility. There is no --auto, resident Codex
 supervisor, hard runtime timeout or machine-validated verdict receipt. Exit0 is
 not QA acceptance; source identity, executed gates and test counts/skips matter.
 Permissions are not OS containment, especially with shell access.
+
+## Session repository scope (4.2.0)
+
+Arbiter, the Desktop build entry and all workers confirm the session's recorded
+absolute directory and resolved repository root before source access or edits.
+Every handoff includes that root and `.opencode/evidence/<task>/`. The selected
+checkout remains authoritative; a Codex handoff never implicitly selects
+`~/.codex/worktrees/`. A mismatched root is a checkpoint, not permission to move
+the session. The optional launcher explicitly creates (or retrieves) an Arbiter
+session, verifies its recorded location before submitting a task, and retains a
+small handoff receipt and process log in a task directory under ignored evidence.
+Preview and doctor still start no inference; preview creates no sessions.
+
+Project source, checkpoints, diagnostics and QA evidence stay inside that root
+by default. Save raw findings/logs only when useful for reproduction, verification
+or recovery; routine discussion stays in chat. Evidence paths must not resolve
+through symlinks outside the root. Fresh scaffolding ignores evidence; updates
+append an effective ignore rule when missing without replacing existing entries,
+custom project rules/config, source, README or Git history. Ignore rules do not
+untrack evidence that was already committed; such files require a separate review.
+Conflicting nested ignore rules stop installation/update before writes and remain
+untouched. When nested rules exist, only the ignore files are mirrored into a
+disposable Git fixture to check directory negations; no project evidence directory
+is created for this check. Evidence is optional and need not exist at setup.
+Source and intentional deliverable docs still belong in normal project paths.
+Never force-add evidence or include it in the shipping scope; ignoring a path is
+protection against ordinary staging, not a prohibition enforced by Git itself.
+
+Accessing another checkout or external historical evidence, creating an external
+worktree, or changing session directory requires explicit path/purpose approval.
+Arbiter arranges foreseeable approvals before an unattended batch. Unexpected
+access needs produce an honest checkpoint. Workers keep external access denied;
+Arbiter can supply bounded facts from explicitly authorized external sources.
+Authorization alone does not override a native deny; permission changes require
+explicit review before dispatch. No copying or relocation of old evidence is
+automatic, and "work autonomously" does not broaden access.
+
+Supported ordered `permissions` rules ask for Arbiter/build external-directory
+access and deny it for workers/helpers. SCV/probe cannot edit root JSON/JSONC or
+`.opencode/` orchestration through edit tools; evidence remains writable.
+Overlord can edit only evidence; Sentry remains read-only. The compatibility
+checker rejects unrestricted external grants and worker overrides that freely
+edit protected orchestration. Existing conflicting overrides are preserved and
+reported for review, not silently rewritten. Native project overrides, plugins,
+session permissions and saved approvals still need review when diagnosing drift.
+
+These are OpenCode tool permissions and agent instructions, **not an OS sandbox**.
+The shell scanner does not prove containment of every script, interpreter,
+redirect, symlink or indirect filesystem operation; edit denies do not constrain
+arbitrary shell writes. Plugins/MCP can expose additional host capabilities.
+Auto-approval can satisfy `ask` without an interactive prompt, so do not use it to
+grant external scope. Use host-level sandboxing if hard isolation is required.
+Provider configuration, credentials and tool-managed session/output stores retain
+normal native loading and locations. They are infrastructure, not project evidence;
+this policy adds no provider/model changes or global filesystem whitelist.
+
+Validated against installed OpenCode **2.3.0**, using isolated XDG directories,
+native merged-agent discovery and the supported session permission API. The
+permission test evaluates real engine decisions (including absolute edit paths),
+then writes only synthetic allowed evidence with the test harness. It does not
+claim an end-to-end model/tool-scanner or OS-isolation test. No inference is needed:
+
+```sh
+NEWOC_NATIVE_TESTS=1 python3.12 -m unittest -v test_newoc.py
+```
+
+See the upstream [V2 permission source](https://github.com/anomalyco/opencode/blob/dev/services/site/src/docs/content/permissions.mdx)
+and verify against the installed CLI/API on upgrades; web docs may describe another
+generation of configuration syntax. Do not replace normal configuration/auth
+loading with hand-maintained directory allowlists.
 
 ## Maintenance and deployment
 
@@ -119,20 +191,35 @@ newoc --update --apply               # apply after ownership checks
 ```
 
 Updates refuse managed-file edits, symlinks, active locks, implicit downgrades,
-file removal without migration and cross-major changes. Project-owned contracts,
-README/AGENTS and ignored local routing are never automatically replaced. A reviewed
+file removal without migration and cross-major changes. Customized AGENTS.md, other
+project-owned contracts, README and ignored local routing are preserved. A reviewed
 migration may list customized template paths in manifest `project_owned`; these
 are excluded from automatic updates and must not also appear in managed `files`.
 Keep their rules/models/hooks under project review. Finder `.DS_Store` metadata
 is excluded from generation and updates; legacy metadata ownership is retired
 without deleting the existing file.
 
-### Plug-and-play ownership (4.0.0)
+### Plug-and-play instructions (4.1.0)
 
-New repositories receive a starter AGENTS.md containing only the project contract.
-Existing AGENTS.md files are preserved verbatim by both `--here` and updates. The
-shared workflow is loaded through native config, so project contracts do not need
-copied role descriptions. PROJECT.md is optional additional project context.
+Shared engineering defaults live in managed `.opencode/BASELINE.md`, explicitly
+loaded alongside WORKFLOW.md through native configuration. AGENTS.md is a small,
+stable place for optional project rules; existing project instructions need no
+copied scaffold policy. PROJECT.md is optional additional project context.
+
+`--here` preserves existing AGENTS.md. Updates restore a missing AGENTS.md and can
+refresh an untouched generated starter. New installations record its original hash;
+older installations are recognized only by exact known template bytes, allowing
+only the substituted project name to vary. Customized or unknown files are preserved
+byte-for-byte, and their content is never adopted as a generated starter. Baseline
+updates therefore work even when AGENTS.md contains entirely custom project rules.
+
+Preview reports the AGENTS.md decision without writing anything. Before replacing
+an untouched starter, apply retains its original bytes at
+`.opencode/evidence/scaffold-updates/AGENTS-<sha256>.md`. Backup collisions and unsafe
+paths fail before managed files change. `starter-history/` contains immutable old
+starter templates for recognition and ships with separate starter deployments;
+it is not copied into projects. No deletion, setup wizard or readiness marker is
+needed for same-major upgrades. Cross-major/layout changes still require review.
 
 OpenCode 2.2.7 loads root `opencode.json` before `.opencode/opencode.json`. The root
 file contains scaffold defaults, including role models, steps and permissions.
@@ -149,6 +236,9 @@ Example project-owned `.opencode/opencode.json`:
     "compaction": {"model": "openai/gpt-6.1-sol"},
     "Arbiter": {
       "permissions": [{"action": "shell", "resource": "git push*", "effect": "deny"}]
+    },
+    "build": {
+      "permissions": [{"action": "shell", "resource": "git push*", "effect": "deny"}]
     }
   },
   "instructions": ["docs/engineering-rules.md"],
@@ -161,6 +251,14 @@ instruction paths are repository-relative. Keep provider endpoints/auth machine-
 Cloud helper routes need project authorization; configuration is not authorization.
 Only configure a plugin that actually exists. These examples do not install plugins
 or register models. Native discovery remains necessary after changing overrides.
+
+The two coordinator entry points share one prompt file. Their native JSON default
+permissions/models are kept aligned by regression checks. Mirror any project
+coordinator permission overrides under both `agents.Arbiter` and `agents.build`;
+updates/dispatch stop on asymmetric rules rather than silently changing access.
+This may require a reviewed edit to an existing project's overrides before update;
+the updater never rewrites those overrides. Other subagents retain their existing
+local routes and delegation denials.
 
 Role permissions are evaluated after global permissions: place stricter role rules
 in `agents.<role>.permissions`. The updater refuses recognized shadowed global denies,
@@ -177,10 +275,45 @@ this layout. Cross-major changes, managed-file edits/collisions and incompatible
 overrides stop before writes. Project-owned exclusions cannot hide shared config,
 workflow or agent definitions; move intentional settings into project overrides.
 
-Existing 1.x–3.x projects need a one-time reviewed migration: retain project rules,
-merge intentional config/role customizations into overrides, establish managed
-shared files, then record the new baseline. `--here` is not an adoption/force option.
-No existing project is migrated merely by changing this template repository.
+### Legacy adoption through --update (4.2.0)
+
+When the manifest is missing, `--update` previews adoption of recognized native
+pre-manifest scaffolds. The same `--update --apply` applies the reviewed plan;
+there is no force flag or hand-written ownership file. `--here` remains for new
+installations, not adoption. No project is migrated merely by editing the source.
+
+`legacy-history/` holds exact fingerprints of reusable historical native roles,
+known frontmatter settings and generic test snapshots. These files ship with the
+standalone starter, not into project checkouts. Unknown/customized role bodies,
+missing roles, root-config collisions, JSONC, incompatible permissions and invalid
+metadata stop before any project writes. A missing manifest is not permission to
+adopt arbitrary `.opencode` content. Unscaffolded repositories receive an actionable
+`newoc --here` message instead of an OS file-not-found error.
+
+The old WORKFLOW.md is retained byte-for-byte as project-owned PROJECT.md, or
+LEGACY-PROJECT.md if PROJECT.md already exists. Both are loaded natively. Existing
+AGENTS.md, README, source, Git history/branch, unrelated files and extra hooks remain
+unchanged. Matching shared config defaults are refreshed; remaining config, model,
+helper and permission overrides survive in `.opencode/opencode.json`. Ordered
+permission exceptions are retained when coordinator constraints are mirrored into
+Desktop build. Conflicting policy stops instead of silently relaxing protections.
+Custom files within the shared plugin path are retained as project-owned exclusions.
+
+Apply saves original replaced files under ignored
+`.opencode/scaffold-backups/legacy-<identity>/files/`, with a separate self-ignore
+file. Configuration backups are recovery infrastructure, separate from optional
+investigation evidence and native provider/auth/session stores. They remain ignored
+even if an apply failure restores a root ignore file lacking the new evidence rule.
+Project credentials are never printed; machine-global configuration/auth is untouched.
+
+Writes use atomic file replacement and restore previous project bytes/modes after
+an ordinary write failure or handled interruption. Recovery backups remain local;
+rollback failures explicitly name paths requiring recovery. This is not a durable
+multi-file filesystem transaction: forced process termination, host failure or
+concurrent edits cannot be guaranteed atomic. Run updates between active sessions.
+Successful adoption writes ownership metadata last; subsequent updates use the
+normal tracked path. Native discovery and preservation tests use disposable repos,
+never inference or live application migrations.
 
 `--update` always reads this local template checkout (or NEWOC_TEMPLATE_DIR). It
 does not fetch remote policy, reload running OpenCode sessions, start inference,
@@ -200,9 +333,9 @@ without sourcing unrelated startup. Native discovery is configuration evidence,
 not sustained live Sol-to-local orchestration acceptance. Run a deliberate small
 smoke task when inference is authorized and GPU capacity is available.
 
-## Publication permission policy (3.0.1)
+## Publication and acceptance policy (4.1.1)
 
-Shared configuration denies Git pushes for workers and helpers. Only Arbiter can request native approval for an ordinary push, after explicit task authorization. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Existing projects require an explicit reviewed update.
+Shared configuration denies Git pushes for workers and helpers. Only the coordinator (Arbiter or its Desktop build entry) preapproves canonical single-branch pushes to `origin/codex/*`, optionally with `-u` or `--set-upstream`, after explicit task authorization. Other destinations/forms, multiple refs and colon refspecs still ask; the agent must verify the target is not the default/protected branch. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Explicit shipping authorization covers delivery through merge when QA, review and required checks pass; human acceptance is required for affected manual criteria or explicit project sign-off rules, not a generic second approval. Existing project rules are never rewritten. Routine startup uses bounded repository inspection and native delegation; runtime/provider discovery is reserved for concrete failures or explicit diagnostics. Existing projects require an explicit reviewed update.
 
 
 ## Sentry code review (3.1.0)
@@ -228,4 +361,5 @@ A receipt is valid only for its reviewed PR head. A pre-commit review must match
 the committed tree or be repeated. Sentry PASS is not human approval or permission
 to merge. In the 4.x layout, compatible scaffold updates install role definitions and native
 routing together; project-owned AGENTS.md/README.md do not need role-description
-merges. Earlier layouts still require a reviewed ownership migration.
+merges. Recognized pre-manifest native layouts can be adopted through --update;
+other legacy/custom layouts fail safely for an explicit ownership review.

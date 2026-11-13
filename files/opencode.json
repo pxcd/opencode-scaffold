@@ -1,6 +1,7 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
+    ".opencode/BASELINE.md",
     ".opencode/WORKFLOW.md",
     ".opencode/PROJECT.md"
   ],
@@ -101,7 +102,27 @@
         },
         {
           "action": "edit",
+          "resource": "opencode.jsonc",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/opencode.jsonc",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.opencode/*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
           "resource": ".opencode/evidence/*",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.opencode/evidence/*",
           "effect": "allow"
         }
       ]
@@ -147,7 +168,27 @@
         },
         {
           "action": "edit",
+          "resource": "opencode.jsonc",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/opencode.jsonc",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.opencode/*",
+          "effect": "deny"
+        },
+        {
+          "action": "edit",
           "resource": ".opencode/evidence/*",
+          "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.opencode/evidence/*",
           "effect": "allow"
         }
       ]
@@ -180,22 +221,53 @@
           "action": "edit",
           "resource": ".opencode/evidence/*",
           "effect": "allow"
+        },
+        {
+          "action": "edit",
+          "resource": "*/.opencode/evidence/*",
+          "effect": "allow"
         }
       ]
     },
     "compaction": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash"
+      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
     },
     "title": {
-      "model": "lmstudio/qwen3.6-35b-a3b-mlx"
+      "model": "lmstudio/qwen3.6-35b-a3b-mlx",
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
     },
     "summary": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash"
+      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "deny"
+        }
+      ]
     },
     "Arbiter": {
       "model": "openai/gpt-6.1-sol",
       "steps": 80,
       "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "ask"
+        },
         {
           "action": "subagent",
           "resource": "*",
@@ -224,6 +296,46 @@
         {
           "action": "shell",
           "resource": "git push*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -u origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push --set-upstream origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/* *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\t*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\n*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\r*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*:*",
           "effect": "ask"
         },
         {
@@ -318,6 +430,150 @@
           "effect": "deny"
         }
       ]
+    },
+    "build": {
+      "model": "openai/gpt-6.1-sol",
+      "steps": 80,
+      "permissions": [
+        {
+          "action": "external_directory",
+          "resource": "*",
+          "effect": "ask"
+        },
+        {
+          "action": "subagent",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "subagent",
+          "resource": "SCV",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "Overlord",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "probe",
+          "effect": "allow"
+        },
+        {
+          "action": "subagent",
+          "resource": "Sentry",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -u origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push --set-upstream origin codex/*",
+          "effect": "allow"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/* *",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\t*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\n*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* codex/*\r*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*:*",
+          "effect": "ask"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--force*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -f*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -f*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -uf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -qf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -vf*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* +*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--mirror*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push*--delete*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* -d*",
+          "effect": "deny"
+        },
+        {
+          "action": "shell",
+          "resource": "git push* :*",
+          "effect": "deny"
+        }
+      ],
+      "mode": "primary",
+      "description": "Desktop entry for the scaffold coordinator",
+      "system": "{file:.opencode/agents/Arbiter.md}"
     }
   },
   "model": "openai/gpt-6.1-sol",

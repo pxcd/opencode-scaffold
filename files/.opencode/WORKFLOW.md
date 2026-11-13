@@ -1,6 +1,7 @@
 # OpenCode Arbiter owns orchestration; Codex intervention is optional
 
-Read root AGENTS.md for the project's commands, invariants, access policy,
+Native configuration loads `.opencode/BASELINE.md` for shared engineering defaults,
+independently of project-owned instructions. Read root AGENTS.md, when present, for the project's commands, invariants, access policy,
 delivery and acceptance. `.opencode/PROJECT.md` holds optional additional
 project references. User instructions
 remain authoritative. Keep handoffs and evidence scoped to the current task.
@@ -14,6 +15,12 @@ fresh Sentry performs final cloud code review. All subagents cannot delegate fur
 Arbiter can launch only SCV, probe, Overlord and Sentry as native subagents.
 Keep local inference sequential by default.
 
+The coordinator has two supported primary entry IDs: `build`, used by the normal
+Desktop composer, and `Arbiter`, used by explicit CLI/API selection. Both load the
+same Arbiter policy and bounded delegation rules. The default named agent remains
+Arbiter. Model selection alone is not proof of routing, but Desktop users do not
+need an @mention, hidden picker or additional command to invoke this policy.
+
 Codex sits above Arbiter for optional task definition, architecture advice,
 concrete escalation and final evidence review. Arbiter must be able to execute
 an authorized task end-to-end without Codex polling, routine checkpoint approval
@@ -24,42 +31,80 @@ supported; the launcher is only an optional handoff/diagnostic entry point.
 Arbiter and Sentry are routed to cloud GPT-6.1 Sol.
 SCV, probe and Overlord remain local;
 maintenance helpers remain local unless the project contract explicitly authorizes
-other helper routes. Check model/provider registrations, effective configuration
-and project plugins before inference; a provider ID alone does not prove a local
-endpoint. Do not install software, reconfigure providers or start competing GPU
+other helper routes. Provider registration, endpoint locality and plugin review
+belong to installation or an explicit routing change/diagnostic. For routine tasks,
+use the loaded native roles and configured routes; a provider ID alone is not
+independent proof of endpoint locality. Do not install software, reconfigure providers or start competing GPU
 workloads without authorization. Configuration discovery does not run inference.
 
-## Startup preflight — before substantive work
+## Task entry and discovery
 
-Configuration discovery and read-only contract preparation may run before the
-project is ready. Before implementation, verification for delivery, worker dispatch,
-commits, pushes or PR/merge actions, establish both of the following:
+A fresh scaffold is usable immediately. There is no onboarding session, completed
+questionnaire or READY marker required before investigation, implementation or
+native worker delegation. Project-specific instructions can be added later.
 
-- The actual primary session agent is **Arbiter**, not merely a Sol model or a
-  configured default. Existing sessions may retain `build` or another agent after
-  scaffold installation. If the active primary role is wrong or cannot be confirmed,
-  stop with the exact next action: select Arbiter (or open a new Arbiter session).
-  Do not silently act as coordinator, invoke Arbiter as a child, or work around
-  missing delegation through shell/API calls. Child workers verify their own
-  assigned role and location; this primary-session check is not a demand that
-  SCV, probe, Overlord or Sentry switch themselves to Arbiter.
-- Root AGENTS.md contains one exact `Status: READY` line and a verified project
-  contract: actual stack/check commands, invariants, access and acceptance boundaries.
-  UNCONFIGURED, missing or conflicting status means setup, not task execution.
-  Inspect only what is authorized to propose the missing contract, clarify genuinely
-  missing permissions/acceptance, and finish that setup before resuming the task.
-  A marker alone is not evidence that commands or access rules were verified.
+Start with the actual cwd, branch, dirty status and task-scoped diff, then read
+only applicable project rules and relevant scripts/CI. Desktop `build` and explicit
+`Arbiter` are both valid primary entries. Use native subagent calls directly;
+ordinary repository work does not require rediscovering OpenCode itself. For a
+committed documentation-only shipment, dispatch Overlord once scope and relevant
+gates are known; no implementation worker is needed.
 
-Report the confirmed checkout, primary role, branch and readiness before the first
-substantive milestone. The optional launcher selects Arbiter explicitly and enforces
-the readiness marker and local project-override compatibility in code; direct
-OpenCode sessions must follow this preflight policy. This policy is not a native
-runtime lock or a guarantee that an arbitrary agent follows instructions. Global
-config/session overrides and real provider endpoints still need native inspection.
+Do not inspect API schemas, enumerate runtime configuration/providers, load the
+OpenCode skill, inventory processes or query historical sessions as routine startup.
+Investigate those only for an observed routing/tool/transport failure, a concrete
+competing-run signal or an explicit OpenCode task. Check only the implicated state;
+a historical task note alone does not require a session-history audit. Workers
+confirm their own assigned role and location, not a primary Arbiter ID.
+
+Keep tool output bounded: use scoped diff/stat, targeted search and selected JSON
+fields. Do not dump all tracked paths, entire configs or large logs. Save long gate
+output in project-local evidence and read relevant tails/sections. If output was
+truncated, rerun a narrower read rather than opening external shell-cache files.
+Read each unchanged fact once per decision; independent QA still gathers its own
+evidence. Revalidate branch/head/base and PR gates before consequential publication,
+merge and cleanup, not on every reasoning turn.
+
+Read existing project instructions and honor substantive access, invariants and
+acceptance rules. Legacy scaffold Status: READY/UNCONFIGURED markers and empty
+starter fields are not execution gates. Do not demand that the user fill them or
+rename a valid Desktop session before beginning the actual task. Preserve existing
+project-owned files; do not rewrite them merely to remove old scaffolding prose.
+
+Discover relevant architecture, scripts, tests and CI as part of the task, through
+bounded source inspection or a worker assignment. Unknown commands are a reason
+to inspect the repository, not to stop all work. Ask only when a specific affected
+action needs a decision or permission the task/repo cannot establish; continue
+independent safe work. Default source access is relevant task code and synthetic
+fixtures, excluding credentials, private runtime data and unrelated archives.
+Live services/device changes, installs and publication still require authorization.
+Explicit project/user restrictions continue to apply.
+
+The optional launcher validates repository config compatibility before dispatch;
+this is not proof of machine-global/session settings or endpoint locality. Native
+instructions are policy rather than an OS sandbox. Inspect effective routing when
+there is a concrete mismatch; do not repeat broad preflight inventories each turn.
+
+## Repository scope
+
+Apply the session repository boundary in `.opencode/BASELINE.md` to Arbiter and
+all children. Confirm the recorded absolute session directory and resolved
+repository root before work, pass that root and a repo-local evidence directory
+in every handoff, and confirm each child's recorded directory before its task.
+Never submit/resume a task in an unsuitable checkout or silently move its session.
+A Codex handoff does not select a Codex worktree. External checkout/worktree,
+historical-evidence access and directory changes require explicit scoped user
+authorization. Arrange approvals before unattended batches; unexpected access
+requirements produce a preserved checkpoint, never a permission bypass.
+Keep useful raw findings/logs under `.opencode/evidence/<task>/`; routine chat
+needs no file. Never force-add evidence or include it in shipment scope; source
+and intentional deliverable documentation still use normal project paths.
+Keep machine provider/auth and native session data in their normal
+stores, separate from project evidence. Do not copy or relocate old evidence.
 
 ## Native task loop
 
-1. Complete startup preflight; confirm absolute checkout, dirty state, issue
+1. Confirm absolute checkout, dirty state, issue
    ownership and any active session.
    Preserve existing work and never duplicate a possibly completed operation.
    Record original scope, acceptance, allowed paths and invariants in
@@ -70,7 +115,8 @@ config/session overrides and real provider endpoints still need native inspectio
    route presentation to probe. A view filename does not imply presentation-only.
    For mixed work, establish the interface with SCV before presentation changes.
 3. One implementation writer per checkout. Concurrent writes require isolated
-   worktrees and explicit integration ownership; worktrees do not isolate models.
+   worktrees and explicit integration ownership; creating an external worktree
+   first requires scoped user authorization. Worktrees do not isolate models.
    Verify native session directories rather than trusting prompts to change cwd.
 4. At a worker checkpoint, inspect the actual diff and executed check output.
    Resume a healthy native child session only for related bounded work. Repeated
@@ -117,8 +163,8 @@ release/develop branch hierarchy. Useful checkpoints are appropriate for longer 
    checks and obtain fresh QA/review after source changes. Record the actual
    review with the repository's existing helper when available; never invent a
    passing check, impersonate human approval or assume every repo has a review gate.
-3. Wait for required CI/review checks, resolve discussions and complete required
-   human acceptance. If integration with the default branch changes the PR head,
+3. Wait for required CI/review checks, resolve discussions and complete applicable
+   human acceptance as defined below. If integration with the default branch changes the PR head,
    repeat relevant verification and review. Follow the repository's exact receipt
    invalidation policy; no earlier-head approval applies to later code.
 4. With explicit merge authorization, squash-merge the PR on the host when the
@@ -142,9 +188,26 @@ release/develop branch hierarchy. Useful checkpoints are appropriate for longer 
 Authorization is scoped: commit/push does not authorize merging; opening a PR does
 not authorize merging either. Explicit commit/push/merge authorization includes
 routine cleanup of that completed branch, subject to the checks above. "Ship it"
-has that meaning only when explicitly established for the project/task. Stop for
+means the full commit/push/PR/merge/verification/cleanup flow in this scaffold,
+unless the user or project narrows it. Stop for
 failed gates, unresolved findings, missing required human acceptance or genuine
 permissions; do not repeatedly ask for routine steps already authorized.
+Human acceptance must name an affected criterion: for example microphone/device
+behavior, visual quality or a product decision that automated QA cannot establish.
+If no affected manual criterion applies and QA/review/required checks pass, existing
+shipping/merge authorization is sufficient; do not ask for a second generic approval.
+A documentation-only change does not automatically require app/device testing.
+Honor explicit project rules requiring owner approval for every PR or a separately
+required sign-off; do not silently weaken them or mark unperformed manual checks as
+passed. State the exact outstanding criterion and source when stopping.
+
+Native coordinator permissions preapprove only an explicit single `codex/*` branch
+push to `origin`, optionally with `-u` or `--set-upstream`. Use that canonical form
+only after task authorization and confirming the target is a feature branch, not
+the repository's default/protected branch. Other push forms, destinations, multiple
+refs and colon refspecs still ask; force/mirror pushes and remote-ref deletion remain
+denied. Workers/helpers cannot push. A stricter project permission can still ask or
+deny. Never rewrite a guarded command to evade its approval; report a genuine gate.
 Configuration is policy, not authorization or proof of host enforcement.
 
 ## Boundaries and evidence
