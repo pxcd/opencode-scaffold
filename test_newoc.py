@@ -118,6 +118,50 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(workflow.read_bytes(),(HERE/'files/.opencode/WORKFLOW.md').read_bytes())
         self.assertEqual(contract.read_text(),'project-owned custom commands\n')
 
+    def test_finder_metadata_is_ignored_for_creation_and_update(self):
+        # Use a disposable template, never contaminate the real source in a test.
+        import shutil
+        source=self.root/'starter'
+        shutil.copytree(HERE/'files',source/'files')
+        for name in ['newoc.py','TEMPLATE_VERSION']:
+            shutil.copy2(HERE/name,source/name)
+        metadata=b'\x00\xffFinder metadata'
+        for relative in ['.DS_Store','.opencode/.DS_Store']:
+            (source/'files'/relative).write_bytes(metadata)
+        script=source/'newoc.py'
+        p=self.root/'clean'
+        r=subprocess.run(['python3.12',str(script),'clean','--root',str(self.root)],capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertFalse(list(p.rglob('.DS_Store')))
+        # Older generators may have recorded metadata; retire ownership without deleting it.
+        m=p/'.opencode/scaffold.json';data=json.loads(m.read_text())
+        finder=p/'.opencode/.DS_Store';finder.write_bytes(metadata)
+        data['files']['.opencode/.DS_Store']=hashlib.sha256(metadata).hexdigest()
+        m.write_text(json.dumps(data))
+        r=subprocess.run(['python3.12',str(script),'--update','--apply'],cwd=p,capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(finder.read_bytes(),metadata)
+        self.assertNotIn('.opencode/.DS_Store',json.loads(m.read_text())['files'])
+
+    def test_update_preserves_explicit_project_owned_config(self):
+        self.assertEqual(self.run_tool('custom','--root',str(self.root)).returncode,0)
+        p=self.root/'custom';config=p/'.opencode/opencode.json'
+        custom=b'{"custom": "project routing and hooks"}\n';config.write_bytes(custom)
+        m=p/'.opencode/scaffold.json';data=json.loads(m.read_text())
+        del data['files']['.opencode/opencode.json']
+        data['project_owned']=['.opencode/opencode.json']
+        m.write_text(json.dumps(data))
+        r=self.run_tool('--update','--apply',cwd=p)
+        self.assertEqual(r.returncode,0,r.stderr)
+        self.assertEqual(config.read_bytes(),custom)
+        self.assertEqual(json.loads(m.read_text())['project_owned'],data['project_owned'])
+        self.assertEqual(self.run_tool('--update',cwd=p).returncode,0)
+        data['files']['.opencode/opencode.json']='overlapping ownership'
+        m.write_text(json.dumps(data));before=m.read_bytes()
+        r=self.run_tool('--update','--apply',cwd=p)
+        self.assertNotEqual(r.returncode,0)
+        self.assertEqual(m.read_bytes(),before);self.assertEqual(config.read_bytes(),custom)
+
     def test_update_refuses_local_edits_and_symlinks_without_partial_writes(self):
         self.assertEqual(self.run_tool('edited','--root',str(self.root)).returncode,0)
         p=self.root/'edited';workflow=p/'.opencode/WORKFLOW.md';workflow.write_text('custom local policy')
@@ -151,6 +195,12 @@ class ScaffoldTests(unittest.TestCase):
         launcher=p/'.opencode/run-local.py'
         args=['python3.12',str(launcher),'Arbiter','--task',str(task)]
         self.assertEqual(subprocess.run(args,capture_output=True).returncode,0)
+        native=json.loads((p/'.opencode/opencode.json').read_text())
+        native['agents']['compaction']['model']='openai/project-authorized-helper'
+        (p/'.opencode/opencode.json').write_text(json.dumps(native))
+        preview=json.loads(subprocess.check_output(args,text=True))
+        self.assertNotIn('compaction',preview['runtime_config']['agents'])
+        self.assertNotIn('enabled_providers',preview['runtime_config'])
         profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['SCV','probe','Overlord']}}
         (p/'.opencode/local.json').write_text(json.dumps(profile))
         r=subprocess.run(args,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)

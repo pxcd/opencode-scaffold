@@ -34,6 +34,11 @@ def routing(root):
             raise ValueError(f'Set a registered local model for {role}')
         if model.split('/', 1)[0] not in providers:
             raise ValueError(f'{role} model is outside local_provider_ids')
+    if not profile_path.exists():
+        # With no explicit launcher profile, preserve native worker/helper routes,
+        # including project-authorized helper models and enabled providers.
+        return {'model': ARBITER_MODEL, 'default_agent': 'Arbiter',
+                'agents': {'Arbiter': {'model': ARBITER_MODEL}}}
     return {
         'model': ARBITER_MODEL,
         'enabled_providers': list(dict.fromkeys(['openai', *providers])),

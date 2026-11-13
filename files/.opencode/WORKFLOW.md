@@ -19,8 +19,9 @@ or repeated intervention. Do not run two competing coordinator loops or have
 Codex dispatch duplicate workers alongside Arbiter. Direct OpenCode use is fully
 supported; the launcher is only an optional handoff/diagnostic entry point.
 
-Only Arbiter is routed to cloud GPT-6.1 Sol. Worker and maintenance-helper routes
-must remain local. Check model/provider registrations, effective configuration
+By default only Arbiter is routed to cloud GPT-6.1 Sol. Workers must remain local;
+maintenance helpers remain local unless the project contract explicitly authorizes
+other helper routes. Check model/provider registrations, effective configuration
 and project plugins before inference; a provider ID alone does not prove a local
 endpoint. Do not install software, reconfigure providers or start competing GPU
 workloads without authorization. Configuration discovery does not run inference.

@@ -23,8 +23,16 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def manifest(contents):
-    return {'version': VERSION, 'files': {str(p): digest(data) for p, data in contents.items() if managed(p)}}
+def template_files():
+    # Finder metadata is binary and is not part of the scaffold, even when ignored by Git.
+    return sorted(p for p in TEMPLATE.rglob('*') if p.is_file() and p.name != '.DS_Store')
+
+
+def manifest(contents, project_owned=()):
+    result = {'version': VERSION, 'files': {str(p): digest(data) for p, data in contents.items() if managed(p)}}
+    if project_owned:
+        result['project_owned'] = sorted(project_owned)
+    return result
 
 
 def update(target, apply=False):
@@ -38,9 +46,17 @@ def update(target, apply=False):
         raise ValueError('Refusing an implicit downgrade; use a reviewed migration')
     if old['version'].split('.')[0] != VERSION.split('.')[0]:
         raise ValueError('Major scaffold change requires a reviewed migration of project-owned AGENTS.md/README.md; no files changed')
-    contents = {p.relative_to(TEMPLATE): p.read_bytes() for p in TEMPLATE.rglob('*') if p.is_file() and managed(p.relative_to(TEMPLATE))}
+    project_owned = old.get('project_owned', [])
+    if (not isinstance(project_owned, list) or
+            any(not isinstance(p, str) or not p.startswith('.opencode/') or
+                '..' in Path(p).parts or str(Path(p)) != p for p in project_owned) or
+            set(project_owned) & set(old['files'])):
+        raise ValueError('Invalid or overlapping project-owned paths; review the migration manifest')
+    contents = {p.relative_to(TEMPLATE): p.read_bytes() for p in template_files()
+                if managed(p.relative_to(TEMPLATE)) and str(p.relative_to(TEMPLATE)) not in project_owned}
     # No implicit deletion or adoption of existing unmanaged files.
-    if set(old['files']) - {str(p) for p in contents}:
+    old_files = {p: h for p, h in old['files'].items() if Path(p).name != '.DS_Store'}
+    if set(old_files) - {str(p) for p in contents}:
         raise ValueError('Template removed managed files; a reviewed migration is required')
     changes = []
     for relative, data in contents.items():
@@ -50,7 +66,7 @@ def update(target, apply=False):
                 break
             if part.is_symlink():
                 raise ValueError(f'Refusing symlink update destination: {part}')
-        previous = old['files'].get(str(relative))
+        previous = old_files.get(str(relative))
         if previous is not None:
             if not destination.is_file() or digest(destination.read_bytes()) != previous:
                 raise ValueError(f'Locally changed managed file; merge manually: {relative}')
@@ -65,7 +81,7 @@ def update(target, apply=False):
         for destination, data in changes:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(data)
-        (target / MANIFEST).write_text(json.dumps(manifest(contents), indent=2)+'\n')
+        (target / MANIFEST).write_text(json.dumps(manifest(contents, project_owned), indent=2)+'\n')
     return target.resolve()
 
 
@@ -78,7 +94,7 @@ def scaffold(target: Path, name: str, *, existing: bool) -> Path:
     elif target.exists():
         raise ValueError(f'Project already exists: {target}; use --here to add agent files safely')
     target = target.absolute()
-    files = sorted(p for p in TEMPLATE.rglob('*') if p.is_file())
+    files = template_files()
     if not files:
         raise ValueError(f'Template files are missing: {TEMPLATE}')
     writes = []

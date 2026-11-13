@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold3.0.1
+# Native Sol Arbiter + local OpenCode scaffold 3.0.2
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, and optional Codex oversight.
@@ -35,7 +35,8 @@ Model IDs are editable repo defaults, not credentials or installed models.
 
 On another machine, register the providers/models and deliberately adjust native
 opencode.json IDs before use. An optional local.json, copied from local.example.json,
-overrides worker/helper IDs only through the launcher; bare OpenCode uses native
+overrides worker/helper IDs only through the launcher. Without that profile, the
+launcher preserves native worker/helper routes; bare OpenCode uses native
 repo defaults. Direct OpenCode therefore needs no ignored profile, launcher or
 Codex connection. Machine-specific model tuning is not bundled; verify it against
 the selected model/runtime rather than importing another project's hooks blindly.
@@ -97,7 +98,12 @@ newoc --update --apply               # apply after ownership checks
 
 Updates refuse managed-file edits, symlinks, active locks, implicit downgrades,
 file removal without migration and cross-major changes. Project-owned contracts,
-README/AGENTS and ignored local routing are never automatically replaced.
+README/AGENTS and ignored local routing are never automatically replaced. A reviewed
+migration may list customized template paths in manifest `project_owned`; these
+are excluded from automatic updates and must not also appear in managed `files`.
+Keep their rules/models/hooks under project review. Finder `.DS_Store` metadata
+is excluded from generation and updates; legacy metadata ownership is retired
+without deleting the existing file.
 
 ### Migrating from2.x
 
