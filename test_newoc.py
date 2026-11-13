@@ -26,7 +26,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(self.git(p,'branch','--show-current'),'main')
         self.assertFalse(self.git(p,'remote'))
         self.assertNotEqual(subprocess.run(['git','-C',str(p),'rev-parse','HEAD'],capture_output=True).returncode,0)
-        for role in ['Arbiter','SCV','Overlord','probe']:
+        for role in ['Arbiter','SCV','Overlord','probe','Sentry']:
             self.assertEqual((p/f'.opencode/agents/{role}.md').read_bytes(),(HERE/f'files/.opencode/agents/{role}.md').read_bytes())
         self.assertIn('# example engineering contract',(p/'AGENTS.md').read_text())
         self.assertFalse((p/'Sources').exists())
@@ -52,6 +52,34 @@ class ScaffoldTests(unittest.TestCase):
             self.assertIn({'action':'shell','resource':resource,'effect':'deny'},shell)
         for role in ['SCV','probe','Overlord']:
             self.assertFalse(any(p['action']=='shell' for p in permissions(role)))
+
+    def test_sentry_is_cloud_read_only_and_dispatchable(self):
+        self.assertEqual(self.run_tool('review', '--root', str(self.root)).returncode, 0)
+        p = self.root/'review'
+        config = json.loads((p/'.opencode/opencode.json').read_text())
+        self.assertEqual(config['agents']['Sentry']['model'], 'openai/gpt-6.1-sol')
+        def header(role):
+            text = (p/f'.opencode/agents/{role}.md').read_text().removeprefix('---\n').split('\n---\n', 1)[0]
+            return json.loads(subprocess.check_output(
+                ['ruby', '-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.safe_load(STDIN.read))'],
+                input=text, text=True))
+        sentry = header('Sentry')
+        self.assertEqual(sentry['mode'], 'subagent')
+        for action in ['edit', 'shell', 'execute', 'subagent', 'external_directory']:
+            self.assertEqual([rule for rule in sentry['permissions'] if rule['action'] == action],
+                             [{'action': action, 'resource': '*', 'effect': 'deny'}])
+        self.assertIn({'action': 'subagent', 'resource': 'Sentry', 'effect': 'allow'},
+                      header('Arbiter')['permissions'])
+        self.assertIn('.opencode/agents/Sentry.md',
+                      json.loads((p/'.opencode/scaffold.json').read_text())['files'])
+        # An old local profile must not require or redirect the cloud reviewer.
+        (p/'.opencode/local.json').write_text(json.dumps({
+            'local_provider_ids': ['lmstudio'],
+            'models': {role: 'lmstudio/test' for role in ['SCV', 'probe', 'Overlord', 'Sentry']}}))
+        (p/'task.md').write_text('Review fixture')
+        preview = json.loads(subprocess.check_output([
+            'python3.12', str(p/'.opencode/run-local.py'), '--task', str(p/'task.md')], text=True))
+        self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'], 'openai/gpt-6.1-sol')
 
     def test_existing_project_refused(self):
         p=self.root/'exists';p.mkdir();(p/'important').write_text('keep')
@@ -200,14 +228,16 @@ class ScaffoldTests(unittest.TestCase):
         (p/'.opencode/opencode.json').write_text(json.dumps(native))
         preview=json.loads(subprocess.check_output(args,text=True))
         self.assertNotIn('compaction',preview['runtime_config']['agents'])
+        self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'],'openai/gpt-6.1-sol')
         self.assertNotIn('enabled_providers',preview['runtime_config'])
         profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['SCV','probe','Overlord']}}
         (p/'.opencode/local.json').write_text(json.dumps(profile))
         r=subprocess.run(args,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
         preview=json.loads(r.stdout)
-        self.assertEqual(set(preview['runtime_config']['agents']),{'Arbiter','SCV','probe','Overlord','title','summary','compaction'})
+        self.assertEqual(set(preview['runtime_config']['agents']),{'Arbiter','SCV','probe','Overlord','Sentry','title','summary','compaction'})
         self.assertEqual(preview['runtime_config']['agents']['Arbiter']['model'],'openai/gpt-6.1-sol')
-        self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n!='Arbiter'))
+        self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'],'openai/gpt-6.1-sol')
+        self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n not in ('Arbiter','Sentry')))
         self.assertIn('Codex intervention is optional',preview['argv'][-1])
         self.assertNotIn('--auto',preview['argv'])
         self.assertFalse((p/'.opencode/evidence').exists())

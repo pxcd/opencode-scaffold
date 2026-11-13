@@ -1,17 +1,17 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Arbiter + local OpenCode scaffold, version3.0.0.
+Created with the native Sol Arbiter + local OpenCode scaffold, version3.1.0.
 
 Open the repo in OpenCode and use **Arbiter**, the default GPT-6.1 Sol coordinator.
 It owns delegation, checkpoints, recovery and fresh independent QA through local
-SCV/probe/Overlord subagents. Codex is an optional upper-level advisor, not a
+SCV/probe/Overlord subagents, followed by fresh Sentry code review on Sol. Codex is an optional upper-level advisor, not a
 resident supervisor. Direct OpenCode use needs no Codex chat or launcher.
 
 Complete `.opencode/PROJECT.md` with this project's stack, commands, invariants,
 access policy and acceptance. Review native model defaults in opencode.json and
 registered machine providers before inference. Endpoints/authentication stay in
-machine OpenCode configuration; never commit credentials. All workers and
-maintenance helpers are local; Arbiter alone uses cloud Sol. Optional local.json
+machine OpenCode configuration; never commit credentials. SCV/probe/Overlord and
+maintenance helpers are local; Arbiter and Sentry use cloud Sol. Optional local.json
 worker overrides apply through the launcher and are ignored by Git.
 
 Preview a prepared repo-local handoff:

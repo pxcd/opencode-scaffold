@@ -2,7 +2,9 @@
 
 GPT-6.1 Sol is OpenCode Arbiter and owns native planning, delegation, recovery
 and independent QA. SCV implements behavior, probe presentation, and a NEW
-Overlord verifies final unchanged source. Local subagents cannot delegate.
+Overlord verifies final unchanged source. A NEW Sentry (GPT-6.1 Sol) independently
+reviews the final revision without editing or running commands. Subagents cannot
+delegate.
 Codex may provide an upper-level handoff, advice or final review; its polling,
 checkpoint approvals and intervention are not required for task execution.
 

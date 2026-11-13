@@ -1,7 +1,8 @@
-# Native Sol Arbiter + local OpenCode scaffold 3.0.2
+# Native Sol Arbiter + local OpenCode scaffold 3.1.0
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
-OpenCode Arbiter**, local SCV/probe/Overlord subagents, and optional Codex oversight.
+OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
+reviewer, and optional Codex oversight.
 Arbiter owns the complete delegation, checkpoint, recovery and independent-QA loop.
 It does not depend on a Codex chat polling or approving routine checkpoints.
 
@@ -27,10 +28,10 @@ models, applications, inference or project publication are started by setup.
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
 Arbiter is primary, pinned to `openai/gpt-6.1-sol`, and can dispatch only SCV,
-probe and Overlord. Workers are native subagents with delegation denied. Default
+probe, Overlord and Sentry. All subagents have delegation denied. Default local
 worker model IDs match the current registered LM Studio choices: Swift1.5 Qwen3.8
 Splash for SCV/Overlord and Qwen3.6 35B A3B for probe. Summary/compaction use the
-local QA model; titles use the local presentation model. Only Arbiter is cloud.
+local QA model; titles use the local presentation model. Arbiter and Sentry use cloud Sol.
 Model IDs are editable repo defaults, not credentials or installed models.
 
 On another machine, register the providers/models and deliberately adjust native
@@ -58,7 +59,7 @@ a local endpoint. Do not start inference during a conflicting GPU workload.
 
 The launcher dispatches Arbiter only, supports resuming a known healthy Arbiter
 session in the same checkout, retains process exits/raw logs and holds a checkout
-lock. Inspect a stale lock's PID/native session before removing it. Fresh Overlord
+lock. Inspect a stale lock's PID/native session before removing it. Fresh Overlord and Sentry
 sessions remain Arbiter's responsibility. There is no --auto, resident Codex
 supervisor, hard runtime timeout or machine-validated verdict receipt. Exit0 is
 not QA acceptance; source identity, executed gates and test counts/skips matter.
@@ -134,3 +135,29 @@ smoke task when inference is authorized and GPU capacity is available.
 ## Publication permission policy (3.0.1)
 
 Shared configuration denies Git pushes for workers and helpers. Only Arbiter can request native approval for an ordinary push, after explicit task authorization. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Existing projects require an explicit reviewed update.
+
+
+## Sentry code review (3.1.0)
+
+Overlord retains independent local source assessment and executed QA. Sentry is a
+fresh, read-only `openai/gpt-6.1-sol` subagent for final code review, with shell,
+edits, nested execution and delegation denied. Arbiter supplies a bounded diff,
+relevant paths, original acceptance, revision identities and QA evidence. Sentry
+returns concrete findings and PASS/FAIL/BLOCKED; it never repairs or publishes.
+Arbiter routes repairs to SCV/probe and obtains fresh QA/review after changes.
+Project cloud-source authorization applies to Sentry too. No extra coordinator or
+continuous Codex supervision is introduced.
+
+Example instruction to Arbiter:
+
+> Commit the scoped changes, push the branch, create a PR, and have Sentry review
+> its exact head commit. Address supported findings through the builders, obtain
+> Overlord QA and fresh Sentry review after fixes, and record the review using the
+> project's existing gate. Leave the PR open for my acceptance; do not merge.
+
+Publication still requires task authorization/native approval and project gates.
+A receipt is valid only for its reviewed PR head. A pre-commit review must match
+the committed tree or be repeated. Sentry PASS is not human approval or permission
+to merge. Existing projects require explicit scaffold updates and a manual merge
+of these role descriptions into project-owned AGENTS.md/README.md; customized
+project-owned routing files must deliberately add Sentry as well.

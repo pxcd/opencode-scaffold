@@ -8,9 +8,10 @@ remain authoritative. Keep handoffs and evidence scoped to the current task.
 
 GPT-6.1 Sol runs as the native OpenCode Arbiter. It owns planning, routing,
 checkpoints, recovery, integration and independent verification. SCV implements
-behavior; probe implements presentation; fresh Overlord independently verifies.
-Workers use local inference and cannot delegate further. Arbiter can launch only
-these three native subagents. Keep local inference sequential by default.
+behavior; probe implements presentation; fresh Overlord independently verifies;
+fresh Sentry performs final cloud code review. All subagents cannot delegate further.
+Arbiter can launch only SCV, probe, Overlord and Sentry as native subagents.
+Keep local inference sequential by default.
 
 Codex sits above Arbiter for optional task definition, architecture advice,
 concrete escalation and final evidence review. Arbiter must be able to execute
@@ -19,7 +20,8 @@ or repeated intervention. Do not run two competing coordinator loops or have
 Codex dispatch duplicate workers alongside Arbiter. Direct OpenCode use is fully
 supported; the launcher is only an optional handoff/diagnostic entry point.
 
-By default only Arbiter is routed to cloud GPT-6.1 Sol. Workers must remain local;
+Arbiter and Sentry are routed to cloud GPT-6.1 Sol.
+SCV, probe and Overlord remain local;
 maintenance helpers remain local unless the project contract explicitly authorizes
 other helper routes. Check model/provider registrations, effective configuration
 and project plugins before inference; a provider ID alone does not prove a local
@@ -52,7 +54,17 @@ workloads without authorization. Configuration discovery does not run inference.
    Record before/after identities including relevant untracked files. QA never
    repairs. Supported FAIL returns to the responsible builder, followed by NEW
    independent QA of the repaired source. Never waive acceptance to obtain PASS.
-6. Distinguish independent QA, hosted CI, human GUI acceptance and publication.
+6. After Overlord QA, dispatch NEW Sentry for independent code review, with original
+   requirements/invariants, base/head SHAs or frozen source identities, scoped diff,
+   relevant paths and raw QA evidence. Cloud-source authorization must cover this
+   review. Sentry reads/searches only and returns PASS/FAIL/BLOCKED with file/line
+   findings and limits; it does not execute tests, repair or publish. Route supported
+   defects through the responsible builder, then obtain fresh Overlord QA and Sentry
+   review after repairs. Verify source identity before/after both independent roles.
+   For PR review, record only against the exact reviewed head SHA using the project
+   gate; later commits invalidate the receipt. Review before commit requires proving
+   the frozen source matches the committed tree, otherwise review the committed head.
+7. Distinguish independent QA/review, hosted CI, human GUI acceptance and publication.
    Stop at the project's agreed boundary. App launches, installs, destructive Git,
    commits/pushes, deployments and external messages need task authorization.
    Escalate genuine permissions, unresolved concrete blockers or user decisions.

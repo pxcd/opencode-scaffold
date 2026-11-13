@@ -80,6 +80,9 @@
     },
     "Arbiter": {
       "model": "openai/gpt-6.1-sol"
+    },
+    "Sentry": {
+      "model": "openai/gpt-6.1-sol"
     }
   },
   "model": "openai/gpt-6.1-sol",
