@@ -336,7 +336,8 @@ class ScaffoldTests(unittest.TestCase):
                {'agents': {'Sentry': {'model':'lmstudio/wrong-route'}}},
                {'agents': {'Sentry': {'permissions':[{'action':'edit','resource':'Sources/*','effect':'allow'}]}}},
                {'agents': {'SCV': {'permissions':[{'action':'subagent','resource':'*','effect':'allow'}]}}},
-               {'agents': {'Overlord': {'disable':True}}}]
+               {'agents': {'Overlord': {'disabled':True}}},
+               {'agents': {'Sentry': {'disabled':True}}}]
         cases.append({'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]})
         for overrides in cases:
             with self.subTest(overrides=overrides):

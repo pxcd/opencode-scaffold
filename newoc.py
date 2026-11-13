@@ -69,7 +69,7 @@ def validate_overrides(target, defaults):
             raise ValueError(f'Project override conflicts with pinned {role} model')
         if role in ('Arbiter', 'SCV', 'probe', 'Overlord', 'Sentry'):
             mode = 'primary' if role == 'Arbiter' else 'subagent'
-            if custom.get('disable') or custom.get('mode', mode) != mode:
+            if custom.get('disabled') or custom.get('mode', mode) != mode:
                 raise ValueError(f'Project override disables or changes required role {role}')
         rules = custom.get('permissions', [])
         if not isinstance(rules, list):
