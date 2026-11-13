@@ -2,7 +2,6 @@
 from fnmatch import fnmatchcase
 import json
 from pathlib import Path
-import re
 
 OVERRIDES = Path('.opencode/opencode.json')
 
@@ -93,11 +92,3 @@ def validate_overrides(target, defaults):
                 if decision(action, '*') != 'deny':
                     raise ValueError(f'Project override weakens Sentry {action} denial')
     return overrides
-
-
-
-def require_ready(root):
-    contract = (root / 'AGENTS.md').read_text()
-    statuses = re.findall(r"^Status:[ \t]*([^\r\n]+)$", contract, re.MULTILINE)
-    if [value.strip() for value in statuses] != ['READY']:
-        raise ValueError('Complete AGENTS.md and mark Status: READY before execution')

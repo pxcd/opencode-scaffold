@@ -9,7 +9,7 @@ import subprocess
 import sys
 import uuid
 
-from preflight import require_ready, validate_overrides
+from preflight import validate_overrides
 
 ROLES = ('SCV', 'probe', 'Overlord')
 ARBITER_MODEL = 'openai/gpt-6.1-sol'
@@ -77,7 +77,8 @@ def main():
         config = routing(root)
         if os.environ.get('OPENCODE_CONFIG_CONTENT'):
             raise ValueError('Existing OPENCODE_CONFIG_CONTENT: reconcile it explicitly before dispatch')
-        env = {**os.environ, 'OPENCODE_CONFIG_CONTENT': json.dumps(config)}
+        # OpenCode uses logical PWD when creating sessions, not just process cwd.
+        env = {**os.environ, 'PWD': str(root), 'OPENCODE_CONFIG_CONTENT': json.dumps(config)}
         command = ['opencode', 'debug', 'agents', '--standalone'] if args.doctor else [
             'opencode', 'run', '--standalone', '--agent', args.role,
             '--model', config['agents'][args.role]['model'], '--format', 'json',
@@ -91,7 +92,6 @@ def main():
                               'note': 'Preview only. Arbiter/Sentry use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
             return 0
         if args.execute:
-            require_ready(root)
             if not args.routing_reviewed:
                 raise ValueError('Inspect native doctor output, provider endpoints and merged plugins first; then pass --routing-reviewed')
         evidence = root / '.opencode/evidence'

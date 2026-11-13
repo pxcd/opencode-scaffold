@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.0.2
+# Native Sol Arbiter + local OpenCode scaffold 4.0.3
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
@@ -24,7 +24,7 @@ models, applications, inference or project publication are started by setup.
 | Layer | Files | Responsibility |
 | --- | --- | --- |
 | Shared orchestration | root `opencode.json`, `.opencode/WORKFLOW.md`, `.opencode/agents/`, launcher and compatibility hook | Updated together; do not edit managed defaults |
-| Project contract | root `AGENTS.md`, optional `.opencode/PROJECT.md`, README, issue/PR templates, `.gitignore` | Project-owned; existing files are never replaced |
+| Project instructions | root `AGENTS.md`, optional `.opencode/PROJECT.md`, README, issue/PR templates, `.gitignore` | Project-owned; existing files are never replaced |
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
@@ -43,23 +43,23 @@ repo defaults. Direct OpenCode therefore needs no ignored profile, launcher or
 Codex connection. Machine-specific model tuning is not bundled; verify it against
 the selected model/runtime rather than importing another project's hooks blindly.
 
-Complete root AGENTS.md and mark Status: READY before substantive work. Arbiter must honor its privacy,
-network, ownership, build/test and delivery rules. Codex can prepare a handoff,
-give requested advice or review final evidence. Native Sol handles routine worker
-failures itself. Genuine permissions, unresolved concrete blockers and the agreed
-human acceptance/publication gates still go to the user. One execution coordinator
-owns a task; do not run a competing Codex worker loop alongside Arbiter.
+A fresh project receives usable minimum instructions in AGENTS.md. Project-specific
+rules are optional additions; no blank questionnaire, setup session or READY marker
+blocks investigation, implementation or configured worker delegation. The coordinator
+discovers relevant commands from source/scripts/CI and asks only when a specific
+consequential action needs a decision or access the task/repository cannot establish.
+Existing project-owned instructions and substantive restrictions are preserved.
+Credentials, private runtime data and unrelated archives are excluded by default.
+Publication and other consequential operations still require task authorization.
+One active execution coordinator owns a task; do not run competing worker loops.
 
-Startup preflight lives in the managed shared workflow. Desktop's normal `build`
-primary entry now loads the Arbiter policy through a native file reference to
-`.opencode/agents/Arbiter.md`; its model, steps and bounded delegation defaults
-match the explicit Arbiter agent. No @mention, custom command or primary-agent
-picker is required. Confirm this effective coordinator setup and establish the
-actual project contract before delivery work. Read-only discovery/contract preparation is allowed during
-setup. Direct OpenCode follows these instructions; this is not a native runtime
-lock. The optional launcher enforces an exact READY marker and uses the same
-project-override compatibility checker as setup/updates, including with local.json.
-It does not validate machine-global/session overrides or prove endpoint locality.
+Desktop's normal `build` primary entry loads the Arbiter policy through a native
+file reference to `.opencode/agents/Arbiter.md`; model, steps and bounded delegation
+defaults match the explicit Arbiter agent. No @mention, extra command or primary-agent
+picker is required. Legacy scaffold status markers are not authorization or runtime
+gates. Verify effective routing when there is a concrete mismatch rather than
+repeating broad startup inventories. The optional launcher checks repository config
+compatibility; it does not prove machine-global/session settings or endpoint locality.
 
 ## Optional launcher and evidence
 
@@ -131,7 +131,7 @@ without deleting the existing file.
 
 ### Plug-and-play ownership (4.0.0)
 
-New repositories receive a starter AGENTS.md containing only the project contract.
+New repositories receive AGENTS.md with usable default engineering instructions.
 Existing AGENTS.md files are preserved verbatim by both `--here` and updates. The
 shared workflow is loaded through native config, so project contracts do not need
 copied role descriptions. PROJECT.md is optional additional project context.

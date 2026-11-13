@@ -28,7 +28,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotEqual(subprocess.run(['git','-C',str(p),'rev-parse','HEAD'],capture_output=True).returncode,0)
         for role in ['Arbiter','SCV','Overlord','probe','Sentry']:
             self.assertEqual((p/f'.opencode/agents/{role}.md').read_bytes(),(HERE/f'files/.opencode/agents/{role}.md').read_bytes())
-        self.assertIn('# example engineering contract',(p/'AGENTS.md').read_text())
+        self.assertIn('# example engineering instructions',(p/'AGENTS.md').read_text())
         self.assertFalse((p/'Sources').exists())
         self.assertTrue((p/'.opencode/agents/Arbiter.md').exists())
         config=json.loads((p/'opencode.json').read_text())
@@ -259,7 +259,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotIn('--auto',preview['argv'])
         self.assertFalse((p/'.opencode/evidence').exists())
         r=subprocess.run(args+['--execute'],capture_output=True,text=True)
-        self.assertNotEqual(r.returncode,0);self.assertIn('AGENTS.md',r.stderr)
+        self.assertNotEqual(r.returncode,0);self.assertIn('routing-reviewed',r.stderr)
         args[2]='Overlord'
         r=subprocess.run(args+['--session','old-session'],capture_output=True,text=True)
         self.assertNotEqual(r.returncode,0);self.assertIn('invalid choice',r.stderr)
@@ -267,16 +267,16 @@ class ScaffoldTests(unittest.TestCase):
     def test_worker_process_exit_and_lock_are_preserved_with_fake_cli(self):
         self.assertEqual(self.run_tool('dispatch','--root',str(self.root)).returncode,0)
         p=self.root/'dispatch';task=p/'task.md';task.write_text('Controlled fake dispatch')
-        (p/'AGENTS.md').write_text('Status: READY\nControlled fixture')
         (p/'.opencode/local.json').write_text(json.dumps({'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test' for r in ['SCV','probe','Overlord']}}))
         bin_dir=self.root/'bin';bin_dir.mkdir();cli=bin_dir/'opencode'
-        cli.write_text('#!/bin/sh\nprintf "fake-worker-result\\n"\nexit 17\n');cli.chmod(0o755)
+        cli.write_text('#!/usr/bin/env python3.12\nimport os\nprint("fake-worker-result")\nprint("SESSION_PWD="+os.environ["PWD"])\nraise SystemExit(17)\n');cli.chmod(0o755)
         env={**os.environ,'PATH':str(bin_dir)+os.pathsep+os.environ['PATH']}
         args=['python3.12',str(p/'.opencode/run-local.py'),'Arbiter','--task',str(task),'--execute','--routing-reviewed']
         r=subprocess.run(args,env=env,text=True,capture_output=True)
         self.assertEqual(r.returncode,17,r.stderr)
         self.assertFalse((p/'.opencode/.worker.lock').exists())
         self.assertIn('fake-worker-result',next((p/'.opencode/evidence').glob('*.log')).read_text())
+        self.assertIn('SESSION_PWD='+str(p),next((p/'.opencode/evidence').glob('*.log')).read_text())
         (p/'.opencode/.worker.lock').write_text('existing-worker')
         r=subprocess.run(args,env=env,text=True,capture_output=True)
         self.assertNotEqual(r.returncode,0)
@@ -284,7 +284,7 @@ class ScaffoldTests(unittest.TestCase):
 
     def test_dispatch_rechecks_overrides_with_and_without_local_profile(self):
         self.assertEqual(self.run_tool('preflight','--root',str(self.root)).returncode,0)
-        p=self.root/'preflight';(p/'AGENTS.md').write_text('Status: READY\nSynthetic contract\n')
+        p=self.root/'preflight'
         task=p/'task.md';task.write_text('Synthetic handoff')
         bin_dir=self.root/'bin';bin_dir.mkdir();marker=self.root/'spawned'
         cli=bin_dir/'opencode'
@@ -313,16 +313,28 @@ class ScaffoldTests(unittest.TestCase):
         r=subprocess.run(launcher+['--execute','--routing-reviewed'],cwd=p,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr);self.assertTrue(marker.exists())
 
-    def test_launcher_requires_one_exact_ready_marker(self):
-        self.assertEqual(self.run_tool('readiness','--root',str(self.root)).returncode,0)
-        p=self.root/'readiness';task=p/'task.md';task.write_text('Synthetic handoff')
+    def test_fresh_and_legacy_instructions_do_not_gate_dispatch(self):
+        self.assertEqual(self.run_tool('usable','--root',str(self.root)).returncode,0)
+        p=self.root/'usable';task=p/'task.md';task.write_text('Synthetic handoff')
+        instructions=p/'AGENTS.md';fresh=instructions.read_text()
+        self.assertNotIn('Status:',fresh)
+        self.assertNotIn('- Project purpose:',fresh)
+        self.assertIn('Preserve existing tracked and untracked work',fresh)
+        bin_dir=self.root/'bin';bin_dir.mkdir();marker=self.root/'spawned'
+        cli=bin_dir/'opencode'
+        cli.write_text('#!/bin/sh\nprintf reached > "$USABLE_TEST_MARKER"\n');cli.chmod(0o755)
+        env={**os.environ,'PATH':str(bin_dir)+os.pathsep+os.environ['PATH'],
+             'USABLE_TEST_MARKER':str(marker)}
         args=['python3.12',str(p/'.opencode/run-local.py'),'--task',str(task),'--execute','--routing-reviewed']
-        for contract in ['No status\n','Status: READY-ish\n','Status: READY\nStatus: READY\n',
-                         'Status: UNCONFIGURED\nStatus: READY\n']:
-            (p/'AGENTS.md').write_text(contract)
-            r=subprocess.run(args,cwd=p,capture_output=True,text=True)
-            self.assertNotEqual(r.returncode,0);self.assertIn('AGENTS.md',r.stderr)
-            self.assertFalse((p/'.opencode/evidence').exists())
+        for text in [fresh,'Status: UNCONFIGURED\n- Project purpose:\n',
+                     '# Existing project rules\nUse CPU-only synthetic tests.\n']:
+            with self.subTest(instructions=text[:40]):
+                instructions.write_text(text);before=instructions.read_bytes()
+                marker.unlink(missing_ok=True)
+                r=subprocess.run(args,cwd=p,env=env,capture_output=True,text=True)
+                self.assertEqual(r.returncode,0,r.stderr);self.assertTrue(marker.exists())
+                self.assertEqual(instructions.read_bytes(),before)
+                self.assertFalse((p/'.opencode/.worker.lock').exists())
 
     def test_major_migration_refused_without_touching_project_instructions(self):
         self.assertEqual(self.run_tool('v2-project','--root',str(self.root)).returncode,0)

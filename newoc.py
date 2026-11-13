@@ -163,7 +163,7 @@ def scaffold(target: Path, name: str, *, existing: bool) -> Path:
     found = subprocess.run(['git', '-C', str(target), 'rev-parse', '--show-toplevel'], capture_output=True, text=True)
     if found.returncode or Path(found.stdout.strip()).resolve() != target.resolve():
         subprocess.run(['git', '-C', str(target), 'init', '-b', 'main'], check=True, stdout=subprocess.DEVNULL)
-    print('Scaffold ready: GPT-6.1 Sol is OpenCode Arbiter; complete AGENTS.md and review project config overrides/local model registration. Codex intervention is optional.', file=sys.stderr)
+    print('Scaffold installed: AGENTS.md provides usable defaults; project-specific rules are optional. Review registered model/provider routes before inference. Codex intervention is optional.', file=sys.stderr)
     return target.resolve()
 
 

@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Arbiter + local OpenCode scaffold, version 4.0.2.
+Created with the native Sol Arbiter + local OpenCode scaffold, version 4.0.3.
 
 Open the repo in OpenCode and use GPT-6.1 Sol normally. Desktop's `build` primary
 entry is configured as the Arbiter coordinator, with the same shared policy and
@@ -10,18 +10,17 @@ It owns delegation, checkpoints, recovery and fresh independent QA through local
 SCV/probe/Overlord subagents, followed by fresh Sentry code review on Sol. Codex is an optional upper-level advisor, not a
 resident supervisor. Direct OpenCode use needs no Codex chat or launcher.
 
-Complete root `AGENTS.md` with this project's stack, commands, invariants,
-access policy and acceptance, then mark Status: READY. Set project overrides in
-`.opencode/opencode.json`; root `opencode.json` contains managed defaults. Review
-registered machine providers before inference. Endpoints/authentication stay in
-machine OpenCode configuration; never commit credentials. SCV/probe/Overlord and
-maintenance helpers are local; Arbiter and Sentry use cloud Sol. Optional local.json
-worker overrides apply through the launcher and are ignored by Git.
+AGENTS.md contains usable engineering defaults immediately. Add project-specific
+commands, architecture, invariants or references later when helpful. Existing
+instructions are preserved; no setup session or READY marker is required.
+The coordinator discovers relevant scripts/tests/CI as part of the requested task
+and asks only for genuinely missing permissions or consequential decisions.
 
-Before substantive work, follow the startup preflight in WORKFLOW.md: confirm
-the coordinator policy/routing (`build` or `Arbiter`), the actual checkout and a
-verified READY project contract. Read-only setup
-can prepare a missing contract; it must not turn into delivery work while unready.
+Set optional project config overrides in `.opencode/opencode.json`; root
+`opencode.json` contains managed defaults. Register machine providers/models before
+inference; endpoints/authentication stay machine-local. SCV/probe/Overlord and
+maintenance helpers are local by default; Arbiter and Sentry use cloud Sol.
+Optional local.json worker overrides apply only through the launcher.
 
 Preview a prepared repo-local handoff:
 `python3.12 .opencode/run-local.py Arbiter --task PATH_TO_HANDOFF`

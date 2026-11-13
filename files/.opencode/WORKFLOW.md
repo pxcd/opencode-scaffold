@@ -35,39 +35,41 @@ and project plugins before inference; a provider ID alone does not prove a local
 endpoint. Do not install software, reconfigure providers or start competing GPU
 workloads without authorization. Configuration discovery does not run inference.
 
-## Startup preflight — before substantive work
+## Task entry and discovery
 
-Configuration discovery and read-only contract preparation may run before the
-project is ready. Before implementation, verification for delivery, worker dispatch,
-commits, pushes or PR/merge actions, establish both of the following:
+A fresh scaffold is usable immediately. There is no onboarding session, completed
+questionnaire or READY marker required before investigation, implementation or
+native worker delegation. Project-specific instructions can be added later.
 
-- The actual primary session is a configured coordinator: `build` or `Arbiter`,
-  running the shared Arbiter policy on Sol with native SCV/probe/Overlord/Sentry
-  delegation allowed and other delegation denied. The `build` ID is expected in
-  Desktop and is not itself a startup failure. If the coordinator policy/routing
-  is missing or cannot be confirmed, stop and report that configuration mismatch;
-  do not direct Desktop users to a picker that may not be exposed.
-  Do not silently act as coordinator, invoke Arbiter as a child, or work around
-  missing delegation through shell/API calls. Child workers verify their own
-  assigned role and location; this primary-session check is not a demand that
-  SCV, probe, Overlord or Sentry switch themselves to Arbiter.
-- Root AGENTS.md contains one exact `Status: READY` line and a verified project
-  contract: actual stack/check commands, invariants, access and acceptance boundaries.
-  UNCONFIGURED, missing or conflicting status means setup, not task execution.
-  Inspect only what is authorized to propose the missing contract, clarify genuinely
-  missing permissions/acceptance, and finish that setup before resuming the task.
-  A marker alone is not evidence that commands or access rules were verified.
+Confirm the actual checkout and coordinator configuration: Desktop `build` and
+explicit `Arbiter` are both valid primary entries when they load the shared policy,
+Sol route and bounded native delegation. A missing/misrouted coordinator is a
+concrete configuration problem; report it rather than bypassing tool permissions.
+Workers confirm their own assigned role and location, not a primary Arbiter ID.
 
-Report the confirmed checkout, primary entry ID, branch and readiness before the first
-substantive milestone. The optional launcher selects Arbiter explicitly and enforces
-the readiness marker and local project-override compatibility in code; direct
-OpenCode sessions must follow this preflight policy. This policy is not a native
-runtime lock or a guarantee that an arbitrary agent follows instructions. Global
-config/session overrides and real provider endpoints still need native inspection.
+Read existing project instructions and honor substantive access, invariants and
+acceptance rules. Legacy scaffold Status: READY/UNCONFIGURED markers and empty
+starter fields are not execution gates. Do not demand that the user fill them or
+rename a valid Desktop session before beginning the actual task. Preserve existing
+project-owned files; do not rewrite them merely to remove old scaffolding prose.
+
+Discover relevant architecture, scripts, tests and CI as part of the task, through
+bounded source inspection or a worker assignment. Unknown commands are a reason
+to inspect the repository, not to stop all work. Ask only when a specific affected
+action needs a decision or permission the task/repo cannot establish; continue
+independent safe work. Default source access is relevant task code and synthetic
+fixtures, excluding credentials, private runtime data and unrelated archives.
+Live services/device changes, installs and publication still require authorization.
+Explicit project/user restrictions continue to apply.
+
+The optional launcher validates repository config compatibility before dispatch;
+this is not proof of machine-global/session settings or endpoint locality. Native
+instructions are policy rather than an OS sandbox. Inspect effective routing when
+there is a concrete mismatch; do not repeat broad preflight inventories each turn.
 
 ## Native task loop
 
-1. Complete startup preflight; confirm absolute checkout, dirty state, issue
+1. Confirm absolute checkout, dirty state, issue
    ownership and any active session.
    Preserve existing work and never duplicate a possibly completed operation.
    Record original scope, acceptance, allowed paths and invariants in
