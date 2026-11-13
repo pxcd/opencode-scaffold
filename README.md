@@ -1,4 +1,4 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.0.0
+# Native Sol Arbiter + local OpenCode scaffold 4.0.1
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
@@ -49,6 +49,15 @@ give requested advice or review final evidence. Native Sol handles routine worke
 failures itself. Genuine permissions, unresolved concrete blockers and the agreed
 human acceptance/publication gates still go to the user. One execution coordinator
 owns a task; do not run a competing Codex worker loop alongside Arbiter.
+
+Startup preflight lives in the managed shared workflow. Check the selected primary
+session agent, not just its model/default: existing sessions may retain `build`
+after setup. Select Arbiter explicitly and establish the actual project contract
+before delivery work. Read-only discovery/contract preparation is allowed during
+setup. Direct OpenCode follows these instructions; this is not a native runtime
+lock. The optional launcher enforces an exact READY marker and uses the same
+project-override compatibility checker as setup/updates, including with local.json.
+It does not validate machine-global/session overrides or prove endpoint locality.
 
 ## Optional launcher and evidence
 

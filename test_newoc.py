@@ -39,6 +39,7 @@ class ScaffoldTests(unittest.TestCase):
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
             self.assertTrue(config['agents'][role]['model'].startswith('lmstudio/'))
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
+        self.assertFalse(list(p.rglob('__pycache__')))
     def test_publication_requires_coordinator_approval(self):
         config=json.loads((HERE/'files/opencode.json').read_text())
         self.assertIn({'action':'shell','resource':'git push*','effect':'deny'},config['permissions'])
@@ -268,6 +269,48 @@ class ScaffoldTests(unittest.TestCase):
         r=subprocess.run(args,env=env,text=True,capture_output=True)
         self.assertNotEqual(r.returncode,0)
         self.assertEqual((p/'.opencode/.worker.lock').read_text(),'existing-worker')
+
+    def test_dispatch_rechecks_overrides_with_and_without_local_profile(self):
+        self.assertEqual(self.run_tool('preflight','--root',str(self.root)).returncode,0)
+        p=self.root/'preflight';(p/'AGENTS.md').write_text('Status: READY\nSynthetic contract\n')
+        task=p/'task.md';task.write_text('Synthetic handoff')
+        bin_dir=self.root/'bin';bin_dir.mkdir();marker=self.root/'spawned'
+        cli=bin_dir/'opencode'
+        cli.write_text('#!/bin/sh\nprintf reached > "$PREFLIGHT_TEST_MARKER"\n');cli.chmod(0o755)
+        env={**os.environ,'PATH':str(bin_dir)+os.pathsep+os.environ['PATH'],
+             'PREFLIGHT_TEST_MARKER':str(marker)}
+        launcher=['python3.12',str(p/'.opencode/run-local.py'),'--task',str(task)]
+        overrides=p/'.opencode/opencode.json'
+        cases=[{'agents':{'Sentry':{'disabled':True}}},
+               {'agents':{'Sentry':{'model':'lmstudio/wrong'}}},
+               {'agents':{'Sentry':{'permissions':[{'action':'shell','resource':'*','effect':'allow'}]}}},
+               {'agents':{'Arbiter':{'permissions':[{'action':'subagent','resource':'Sentry','effect':'deny'}]}}}]
+        for local in [False,True]:
+            if local:
+                (p/'.opencode/local.json').write_text(json.dumps({'local_provider_ids':['lmstudio'],
+                    'models':{r:'lmstudio/test' for r in ['SCV','probe','Overlord']}}))
+            for custom in cases:
+                overrides.write_text(json.dumps(custom));before=overrides.read_bytes()
+                for flags in [[],['--doctor'],['--execute','--routing-reviewed']]:
+                    with self.subTest(local=local,custom=custom,flags=flags):
+                        r=subprocess.run(launcher+flags,cwd=p,env=env,capture_output=True,text=True)
+                        self.assertNotEqual(r.returncode,0,r.stdout+r.stderr)
+                        self.assertFalse(marker.exists());self.assertFalse((p/'.opencode/evidence').exists())
+                        self.assertEqual(overrides.read_bytes(),before)
+        overrides.write_text('{}\n')
+        r=subprocess.run(launcher+['--execute','--routing-reviewed'],cwd=p,env=env,capture_output=True,text=True)
+        self.assertEqual(r.returncode,0,r.stderr);self.assertTrue(marker.exists())
+
+    def test_launcher_requires_one_exact_ready_marker(self):
+        self.assertEqual(self.run_tool('readiness','--root',str(self.root)).returncode,0)
+        p=self.root/'readiness';task=p/'task.md';task.write_text('Synthetic handoff')
+        args=['python3.12',str(p/'.opencode/run-local.py'),'--task',str(task),'--execute','--routing-reviewed']
+        for contract in ['No status\n','Status: READY-ish\n','Status: READY\nStatus: READY\n',
+                         'Status: UNCONFIGURED\nStatus: READY\n']:
+            (p/'AGENTS.md').write_text(contract)
+            r=subprocess.run(args,cwd=p,capture_output=True,text=True)
+            self.assertNotEqual(r.returncode,0);self.assertIn('AGENTS.md',r.stderr)
+            self.assertFalse((p/'.opencode/evidence').exists())
 
     def test_major_migration_refused_without_touching_project_instructions(self):
         self.assertEqual(self.run_tool('v2-project','--root',str(self.root)).returncode,0)
