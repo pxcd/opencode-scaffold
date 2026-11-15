@@ -60,7 +60,9 @@ def routing(root):
             models.setdefault(new, models[old])
     if not isinstance(providers, list) or not providers or not all(isinstance(p, str) and p for p in providers):
         raise ValueError('local_provider_ids must list reviewed local provider IDs')
-    for role in ROLES:
+    if profile_path.exists():
+        models['title'] = models.get('title', models.get('probe', native['agents']['title']['model']))
+    for role in (*ROLES, 'title') if profile_path.exists() else ROLES:
         model = models.get(role)
         if not isinstance(model, str) or '/' not in model or 'REPLACE' in model or any(c.isspace() for c in model):
             raise ValueError(f'Set a registered local model for {role}')
@@ -78,7 +80,7 @@ def routing(root):
         'default_agent': 'Cartman',
         'agents': {**{name: {'model': models[name] if name in ROLES else models['Kyle']}
                    for name in (*ROLES, *HELPERS)},
-                   'title': {'model': models.get('probe', models['Butters'])},
+                   'title': {'model': models['title']},
                    'Cartman': {'model': ARBITER_MODEL},
                    'Stan': {'model': ARBITER_MODEL}},
     }

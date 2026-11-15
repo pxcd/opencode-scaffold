@@ -83,6 +83,55 @@ class ScaffoldTests(unittest.TestCase):
         result=self.run_tool('--update',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('0 file changes',result.stderr)
 
+    def test_tracked_v3_upgrade_preserves_exact_json_access_boundary(self):
+        p=self.legacy_fixture('tracked-v3')
+        project=p/'.opencode/PROJECT.md';project.write_text('Private data stays local. No model jobs during migration.\n')
+        shared=p/'.opencode/WORKFLOW.md';shared.write_bytes((HERE/'legacy-history/native-v3/WORKFLOW.md').read_bytes())
+        launcher=p/'.opencode/run-local.py';launcher.write_text('print("old launcher")\n')
+        files={str(f.relative_to(p)):hashlib.sha256(f.read_bytes()).hexdigest()
+               for f in [shared,launcher,*(p/'.opencode/agents').glob('*.md')]}
+        for name in ['SCV','Overlord']:
+            f=p/f'.opencode/agents/{name}.md'
+            f.write_bytes(f.read_bytes().replace(b'- action: external_directory\n  resource: "*"\n  effect: deny\n',b'',1))
+        rules=[{'action':'external_directory','resource':'*','effect':'deny'},
+               {'action':'external_directory','resource':str(self.root/'archive')+'/*','effect':'allow'},
+               {'action':'read','resource':str(self.root/'archive')+'/*','effect':'deny'},
+               *[{'action':'read','resource':str(self.root/'archive'/f'allowed-{i}.json'),'effect':'allow'} for i in range(27)]]
+        config=p/'.opencode/opencode.json';data=json.loads(config.read_text())
+        for name in ['SCV','Overlord']:data['agents'][name]={'model':'lmstudio/project-local','permissions':rules}
+        config.write_text(json.dumps(data))
+        meta=p/'.opencode/scaffold.json';meta.write_text(json.dumps({'version':'3.0.2','files':files,'project_owned':['.opencode/opencode.json']}))
+        before=self.snapshot(p)
+        result=self.run_tool('--update',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(self.snapshot(p),before)
+        result=self.run_tool('--update','--apply',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
+        current=json.loads(config.read_text())
+        for name in ['Butters','Kyle']:
+            self.assertEqual(current['agents'][name]['permissions'],rules)
+            self.assertEqual(current['agents'][name]['model'],'lmstudio/project-local')
+        self.assertEqual(project.read_bytes(),before['.opencode/PROJECT.md'])
+        self.assertFalse((p/'.opencode/LEGACY-PROJECT.md').exists())
+        self.assertEqual((p/'AGENTS.md').read_bytes(),before['AGENTS.md'])
+        self.assertEqual((p/'source.txt').read_bytes(),before['source.txt'])
+        result=self.run_tool('--update',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('0 file changes',result.stderr)
+
+    def test_launcher_preserves_and_validates_title_route(self):
+        import shutil
+        self.assertEqual(self.run_tool('title-route','--root',str(self.root)).returncode,0)
+        p=self.root/'title-route';profile=p/'.opencode/local.json'
+        shutil.copyfile(p/'.opencode/local.example.json',profile)
+        args=['python3.12',str(p/'.opencode/run-local.py'),'--task',str(p/'AGENTS.md')]
+        result=subprocess.run(args,capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout)['runtime_config']['agents']['title']['model'],
+                         json.loads((p/'opencode.json').read_text())['agents']['title']['model'])
+        profile.write_text(json.dumps({'local_provider_ids':['lmstudio'],'models':{
+            'SCV':'lmstudio/local','Overlord':'lmstudio/local','probe':'openai/gpt-6.1-sol'}}))
+        result=subprocess.run(args,capture_output=True,text=True)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('title model is outside local_provider_ids',result.stderr)
+
     def test_legacy_project_file_and_custom_shared_plugin_are_preserved(self):
         p=self.legacy_fixture()
         project=p/'.opencode/PROJECT.md';project.write_text('Existing optional project policy\n')
@@ -525,7 +574,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotIn('compaction',preview['runtime_config']['agents'])
         self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.1-sol')
         self.assertNotIn('enabled_providers',preview['runtime_config'])
-        profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['Butters','Kyle']}}
+        profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['Butters','Kyle','title']}}
         (p/'.opencode/local.json').write_text(json.dumps(profile))
         r=subprocess.run(args,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
         preview=json.loads(r.stdout)

@@ -219,6 +219,8 @@ def update(target, apply=False):
         raise ValueError('Invalid scaffold manifest version/files; restore valid ownership metadata, no files changed')
     if tuple(map(int, old['version'].split('.'))) > tuple(map(int, VERSION.split('.'))):
         raise ValueError('Refusing an implicit downgrade; use a reviewed migration')
+    if old['version'].split('.')[0] == '3' and old.get('layout') is None:
+        return legacy_update(target, apply, old)
     if old['version'].split('.')[0] != VERSION.split('.')[0]:
         raise ValueError('Major scaffold change requires a reviewed migration of project-owned AGENTS.md/README.md; no files changed')
     if old.get('layout') != LAYOUT:
@@ -300,13 +302,13 @@ def update(target, apply=False):
     return target.resolve()
 
 
-def legacy_update(target, apply=False):
+def legacy_update(target, apply=False, ownership=None):
     from legacy import plan
     defaults = json.loads((TEMPLATE / 'opencode.json').read_text())
     contents = {path.relative_to(TEMPLATE): path.read_bytes() for path in template_files()
                 if managed(path.relative_to(TEMPLATE))}
     catalog = json.loads((TEMPLATE.parent / 'legacy-history/native-v3.json').read_text())
-    writes, project_owned, overrides, messages = plan(target, contents, catalog, defaults, safe_update_destination)
+    writes, project_owned, overrides, messages = plan(target, contents, catalog, defaults, safe_update_destination, ownership)
     validate_overrides(target, defaults, overrides)
     starter = None
     instruction_path = target / INSTRUCTIONS
@@ -333,7 +335,7 @@ def legacy_update(target, apply=False):
     for message in messages:
         print('  ' + message, file=sys.stderr)
     for relative in sorted(writes):
-        print('  ' + str(relative), file=sys.stderr)
+        print('  ' + ('remove ' if writes[relative] is None else '') + str(relative), file=sys.stderr)
     print('  Preserve AGENTS.md, README, source, Git history and unrelated files; originals backed up locally on apply', file=sys.stderr)
     if apply:
         apply_files(target, backups, new_mode=0o600)

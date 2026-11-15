@@ -393,3 +393,18 @@ to merge. In the 4.x layout, compatible scaffold updates install role definition
 routing together; project-owned AGENTS.md/README.md do not need role-description
 merges. Recognized pre-manifest native layouts can be adopted through --update;
 other legacy/custom layouts fail safely for an explicit ownership review.
+
+### Tracked native v3 adoption
+
+Recognized native 3.x manifests without a layout marker can also use --update.
+Unchanged owned helper/template files are replaced using their recorded hashes;
+modified helpers refuse, and modified plugins remain project-owned. Native role
+files still require exact known fingerprints, including historical variants whose
+external boundary is configured in project JSON. No arbitrary role edits are
+adopted. Models and ordered JSON access rules survive the ID migration unchanged.
+Only an owned, fingerprint-known shared workflow is replaced without loading its
+old generic rules as project instructions. Unknown/custom workflows are preserved
+as project policy. Project-owned PROJECT.md, AGENTS.md, source, and Git state remain
+untouched; this does not start training, inference or inspect private datasets.
+The launcher validates the chosen title helper model as local, including a legacy
+probe title override, and otherwise preserves the native title route.

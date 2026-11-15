@@ -33,6 +33,21 @@
           "steps": 32,
           "mode": "subagent"
         }
+      },
+      "44fca66e5195f129e155a14d781e69f231b9ef7b199cd26981542e22daef40bc": {
+        "snapshot": "starter-v3-json-boundary",
+        "settings": {
+          "steps": 32,
+          "mode": "subagent"
+        }
+      },
+      "8c36f0d4f02cdd0adc5c66a727540bed859d8bebeb2b18f9d8d9ba3ce04628c1": {
+        "snapshot": "native-v3-json-boundary",
+        "settings": {
+          "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+          "steps": 32,
+          "mode": "subagent"
+        }
       }
     },
     "probe": {
@@ -67,7 +82,25 @@
           "steps": 40,
           "mode": "subagent"
         }
+      },
+      "d8ce1ce2e57a24daea737f67fe23c741e659720d7de4c4737daea9acd360f173": {
+        "snapshot": "starter-v3-json-boundary",
+        "settings": {
+          "steps": 40,
+          "mode": "subagent"
+        }
+      },
+      "ce3d07764f6d1e9769ba4d737b6feb4a8f89f09b98c391baeaccd80594344f9a": {
+        "snapshot": "native-v3-json-boundary",
+        "settings": {
+          "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+          "steps": 40,
+          "mode": "subagent"
+        }
       }
     }
-  }
+  },
+  "shared_workflows": [
+    "8f5551cc1bbec9f1c729252e3cf620975e770334e0451762a8060590c391647e"
+  ]
 }
