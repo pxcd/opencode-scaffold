@@ -32,7 +32,7 @@ requiring a separate setup session, questionnaire or readiness marker.
 ## Session repository boundary
 
 Before working, confirm the session's recorded absolute directory and resolve the
-repository root (for Git, `git rev-parse --show-toplevel`). Arbiter and every worker
+repository root (for Git, `git rev-parse --show-toplevel`). Cartman and every worker
 must agree on that root before any source access or edits. A mismatch is a
 CHECKPOINT: report it rather than changing the session directory. The selected
 checkout is authoritative; inherited Codex cwd, project display names and historical
@@ -51,11 +51,11 @@ or include `.opencode/evidence/` in a commit or publication scope.
 Access to another checkout, an external worktree, historical evidence outside the
 root, or a change of session directory requires explicit user authorization for
 the exact path and purpose. "Work autonomously" does not grant filesystem scope.
-Do not copy, modify or relocate historical evidence automatically. Arbiter must
+Do not copy, modify or relocate historical evidence automatically. Cartman must
 arrange required external-access approvals before an unattended batch. Workers
-must checkpoint unexpected access needs to Arbiter; never bypass a denial using
+must checkpoint unexpected access needs to Cartman; never bypass a denial using
 shell, scripts, symlinks, alternate tools or path spellings. Authorization does not
-override a native deny: use bounded authorized facts supplied by Arbiter or have
+override a native deny: use bounded authorized facts supplied by Cartman or have
 the user explicitly approve a reviewed permission change before dispatch.
 
 Normal OpenCode loading of machine provider configuration, authentication and

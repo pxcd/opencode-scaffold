@@ -1,13 +1,13 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Arbiter + local OpenCode scaffold, version 4.2.0.
+Created with the native Sol Cartman + local OpenCode scaffold, version 4.3.0.
 
 Open the repo in OpenCode and use GPT-6.1 Sol normally. Desktop's `build` primary
-entry is configured as the Arbiter coordinator, with the same shared policy and
-bounded delegation as the explicit `Arbiter` CLI/API agent. No @mention or agent
-picker is required. The named default remains Arbiter for explicit entry points.
+entry is configured as the Cartman coordinator, with the same shared policy and
+bounded delegation as the explicit `Cartman` CLI/API agent. No @mention or agent
+picker is required. The named default remains Cartman for explicit entry points.
 It owns delegation, checkpoints, recovery and fresh independent QA through local
-SCV/probe/Overlord subagents, followed by fresh Sentry code review on Sol. Codex is an optional upper-level advisor, not a
+Butters/Kyle subagents, followed by fresh Stan code review on Sol. Codex is an optional upper-level advisor, not a
 resident supervisor. Direct OpenCode use needs no Codex chat or launcher.
 
 Managed `.opencode/BASELINE.md` supplies usable engineering defaults immediately;
@@ -19,12 +19,12 @@ and asks only for genuinely missing permissions or consequential decisions.
 
 Set optional project config overrides in `.opencode/opencode.json`; root
 `opencode.json` contains managed defaults. Register machine providers/models before
-inference; endpoints/authentication stay machine-local. SCV/probe/Overlord and
-maintenance helpers are local by default; Arbiter and Sentry use cloud Sol.
+inference; endpoints/authentication stay machine-local. Butters/Kyle and
+maintenance helpers are local by default; Cartman and Stan use cloud Sol.
 Optional local.json worker overrides apply only through the launcher.
 
 Preview a prepared repo-local handoff:
-`python3.12 .opencode/run-local.py Arbiter --task PATH_TO_HANDOFF`
+`python3.12 .opencode/run-local.py Cartman --task PATH_TO_HANDOFF`
 Inspect effective native routes without inference by adding `--doctor`.
 Actual execution requires `--execute --routing-reviewed`; verify provider URLs,
 model registration, merged plugins, task authorization and GPU availability.
@@ -43,6 +43,6 @@ overrides; no launcher is required. Stricter role permissions belong in
 `agents.<role>.permissions`, because native role rules follow global rules.
 
 Coordinator permission overrides must be identical under both `agents.build` and
-`agents.Arbiter`. Updates/dispatch refuse asymmetric rules instead of dropping a
+`agents.Cartman`. Updates/dispatch refuse asymmetric rules instead of dropping a
 stricter rule when changing entry point. Existing project override files are never
 rewritten automatically. Native discovery verifies the actual loaded policy.

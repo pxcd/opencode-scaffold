@@ -3,12 +3,13 @@
   "instructions": [
     ".opencode/BASELINE.md",
     ".opencode/WORKFLOW.md",
-    ".opencode/PROJECT.md"
+    ".opencode/PROJECT.md",
+    ".opencode/HANDOFFS.md"
   ],
   "experimental": {
     "subagent_depth": 1
   },
-  "default_agent": "Arbiter",
+  "default_agent": "Cartman",
   "compaction": {
     "auto": true,
     "keep": {
@@ -61,7 +62,7 @@
     "./.opencode/plugins/step-limit-compat"
   ],
   "agents": {
-    "SCV": {
+    "Butters": {
       "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
       "steps": 32,
       "permissions": [
@@ -127,73 +128,7 @@
         }
       ]
     },
-    "probe": {
-      "model": "lmstudio/qwen3.6-35b-a3b-mlx",
-      "steps": 32,
-      "permissions": [
-        {
-          "action": "external_directory",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "subagent",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "execute",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "opencode.json",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "*/opencode.json",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": ".opencode/*",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "*/.config/opencode/*",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "opencode.jsonc",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "*/opencode.jsonc",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "*/.opencode/*",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": ".opencode/evidence/*",
-          "effect": "allow"
-        },
-        {
-          "action": "edit",
-          "resource": "*/.opencode/evidence/*",
-          "effect": "allow"
-        }
-      ]
-    },
-    "Overlord": {
+    "Kyle": {
       "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
       "steps": 40,
       "permissions": [
@@ -259,7 +194,7 @@
         }
       ]
     },
-    "Arbiter": {
+    "Cartman": {
       "model": "openai/gpt-6.1-sol",
       "steps": 80,
       "permissions": [
@@ -275,22 +210,17 @@
         },
         {
           "action": "subagent",
-          "resource": "SCV",
+          "resource": "Butters",
           "effect": "allow"
         },
         {
           "action": "subagent",
-          "resource": "Overlord",
+          "resource": "Kyle",
           "effect": "allow"
         },
         {
           "action": "subagent",
-          "resource": "probe",
-          "effect": "allow"
-        },
-        {
-          "action": "subagent",
-          "resource": "Sentry",
+          "resource": "Stan",
           "effect": "allow"
         },
         {
@@ -400,7 +330,7 @@
         }
       ]
     },
-    "Sentry": {
+    "Stan": {
       "model": "openai/gpt-6.1-sol",
       "steps": 40,
       "permissions": [
@@ -447,22 +377,17 @@
         },
         {
           "action": "subagent",
-          "resource": "SCV",
+          "resource": "Butters",
           "effect": "allow"
         },
         {
           "action": "subagent",
-          "resource": "Overlord",
+          "resource": "Kyle",
           "effect": "allow"
         },
         {
           "action": "subagent",
-          "resource": "probe",
-          "effect": "allow"
-        },
-        {
-          "action": "subagent",
-          "resource": "Sentry",
+          "resource": "Stan",
           "effect": "allow"
         },
         {
@@ -573,7 +498,7 @@
       ],
       "mode": "primary",
       "description": "Desktop entry for the scaffold coordinator",
-      "system": "{file:.opencode/agents/Arbiter.md}"
+      "system": "{file:.opencode/agents/Cartman.md}"
     }
   },
   "model": "openai/gpt-6.1-sol",

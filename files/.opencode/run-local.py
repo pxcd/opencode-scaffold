@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.12
-"""Optional native Arbiter handoff. Preview/doctor never start inference."""
+"""Optional native Cartman handoff. Preview/doctor never start inference."""
 import argparse
 from datetime import datetime, timezone
 import json
@@ -11,7 +11,7 @@ import uuid
 
 from preflight import validate_overrides
 
-ROLES = ('SCV', 'probe', 'Overlord')
+ROLES = ('Butters', 'Kyle')
 ARBITER_MODEL = 'openai/gpt-6.1-sol'
 HELPERS = ('compaction', 'title', 'summary')
 
@@ -23,7 +23,7 @@ def verified_session(root, env, session_id=None):
         command += ['session.get', '--param', 'sessionID=' + session_id]
     else:
         command += ['session.create', '--data', json.dumps({
-            'location': {'directory': str(root)}, 'agent': 'Arbiter',
+            'location': {'directory': str(root)}, 'agent': 'Cartman',
             'model': {'providerID': 'openai', 'id': 'gpt-6.1-sol'}})]
     result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True)
     if result.returncode:
@@ -32,30 +32,37 @@ def verified_session(root, env, session_id=None):
     directory = session.get('location', {}).get('directory')
     if not directory or not Path(directory).is_absolute() or Path(directory).resolve() != root:
         raise ValueError(f'Session {session.get("id")} has an unsuitable repository root; no task submitted')
-    if session.get('agent') != 'Arbiter':
-        raise ValueError('Resume requires an Arbiter session; no task submitted')
+    if session.get('agent') != 'Cartman':
+        raise ValueError('Resume requires a Cartman session; no task submitted')
     return session['id']
 
 
 def routing(root):
     native = json.loads((root / 'opencode.json').read_text())
     overrides = validate_overrides(root, native)
+    native['agents'] = {**native['agents'], **{
+        role: {**native['agents'].get(role, {}), **settings}
+        for role, settings in overrides.get('agents', {}).items()}}
     profile_path = root / '.opencode/local.json'
     if profile_path.exists():
         profile = json.loads(profile_path.read_text())
     else:
-        native['agents'] = {**native['agents'], **{
-            role: {**native['agents'].get(role, {}), **settings}
-            for role, settings in overrides.get('agents', {}).items()}}
         profile = {
             'local_provider_ids': ['lmstudio'],
             'models': {role: native['agents'][role]['model'] for role in ROLES},
         }
     providers = profile['local_provider_ids']
-    models = profile['models']
+    models = dict(profile['models'])
+    for old, new in [('SCV', 'Butters'), ('Overlord', 'Kyle')]:
+        if old in models:
+            if new in models and models[new] != models[old]:
+                raise ValueError(f'Conflicting {old}/{new} launcher model overrides')
+            models.setdefault(new, models[old])
     if not isinstance(providers, list) or not providers or not all(isinstance(p, str) and p for p in providers):
         raise ValueError('local_provider_ids must list reviewed local provider IDs')
-    for role in ROLES:
+    if profile_path.exists():
+        models['title'] = models.get('title', models.get('probe', native['agents']['title']['model']))
+    for role in (*ROLES, 'title') if profile_path.exists() else ROLES:
         model = models.get(role)
         if not isinstance(model, str) or '/' not in model or 'REPLACE' in model or any(c.isspace() for c in model):
             raise ValueError(f'Set a registered local model for {role}')
@@ -64,31 +71,33 @@ def routing(root):
     if not profile_path.exists():
         # With no explicit launcher profile, preserve native worker/helper routes,
         # including project-authorized helper models and enabled providers.
-        return {'model': ARBITER_MODEL, 'default_agent': 'Arbiter',
-                'agents': {'Arbiter': {'model': ARBITER_MODEL},
-                           'Sentry': {'model': ARBITER_MODEL}}}
+        return {'model': ARBITER_MODEL, 'default_agent': 'Cartman',
+                'agents': {'Cartman': {'model': ARBITER_MODEL},
+                           'Stan': {'model': ARBITER_MODEL}}}
     return {
         'model': ARBITER_MODEL,
         'enabled_providers': list(dict.fromkeys(['openai', *providers])),
-        'default_agent': 'Arbiter',
-        'agents': {**{name: {'model': models[name] if name in ROLES else models['Overlord']}
+        'default_agent': 'Cartman',
+        'agents': {**{name: {'model': models[name] if name in ROLES else models['Kyle']}
                    for name in (*ROLES, *HELPERS)},
-                   'title': {'model': models['probe']},
-                   'Arbiter': {'model': ARBITER_MODEL},
-                   'Sentry': {'model': ARBITER_MODEL}},
+                   'title': {'model': models['title']},
+                   'Cartman': {'model': ARBITER_MODEL},
+                   'Stan': {'model': ARBITER_MODEL}},
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('role', nargs='?', default='Arbiter', choices=['Arbiter'])
+    parser.add_argument('role', nargs='?', default='Cartman', choices=['Cartman', 'Arbiter'])
     parser.add_argument('--task', required=True, type=Path, help='Repo-local handoff file')
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--doctor', action='store_true', help='Native agent discovery only; no inference')
     modes.add_argument('--execute', action='store_true', help='Start native Sol orchestration; authorized tasks may invoke local workers')
     parser.add_argument('--routing-reviewed', action='store_true', help='Reviewed Sol coordinator and local worker/helper routes, providers and plugins')
-    parser.add_argument('--session', help='Resume a known healthy Arbiter session from this checkout')
+    parser.add_argument('--session', help='Resume a known healthy Cartman session from this checkout')
     args = parser.parse_args()
+    if args.role == 'Arbiter':
+        args.role = 'Cartman'
     root = Path(__file__).resolve().parent.parent
     try:
         task = args.task.resolve()
@@ -104,13 +113,13 @@ def main():
             'opencode', 'run', '--standalone', '--agent', args.role,
             '--model', config['agents'][args.role]['model'], '--format', 'json',
             '--file', str(task),
-            'Own the attached task through native local delegation, recovery, fresh Overlord QA and Sentry code review. Codex intervention is optional. Preserve project acceptance and authorization boundaries; return evidence.',
+            'Own the attached task through native local delegation, recovery, fresh Kyle QA and Stan code review. Codex intervention is optional. Preserve project acceptance and authorization boundaries; return evidence.',
         ]
         if not args.doctor and not args.execute:
             if args.session:
                 command += ['--session', args.session]
             print(json.dumps({'cwd': str(root), 'argv': command, 'runtime_config': config,
-                              'note': 'Preview only. Arbiter/Sentry use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
+                              'note': 'Preview only. Cartman/Stan use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
             return 0
         if args.execute:
             if not args.routing_reviewed:
@@ -133,7 +142,7 @@ def main():
                 command += ['--session', session_id]
                 (run_evidence / 'handoff.json').write_text(json.dumps({
                     'sessionID': session_id, 'directory': str(root), 'task': str(task)}, indent=2) + '\n')
-            print(f'{"Discovery" if args.doctor else "OpenCode Arbiter"}: {log}', flush=True)
+            print(f'{"Discovery" if args.doctor else "OpenCode Cartman"}: {log}', flush=True)
             with log.open('x') as stream:
                 result = subprocess.run(command, cwd=root, env=env, stdout=stream, stderr=subprocess.STDOUT)
             print(f'PROCESS_EXIT={result.returncode}; log={log}')

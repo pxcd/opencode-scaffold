@@ -18,14 +18,14 @@ def validate_overrides(target, defaults, overrides=None):
         overrides = json.loads(path.read_text()) if path.exists() else {}
     if not isinstance(overrides, dict):
         raise ValueError('Project overrides must be a JSON object')
-    if overrides.get('default_agent', 'Arbiter') != 'Arbiter':
-        raise ValueError('Project override conflicts with scaffold default_agent Arbiter')
+    if overrides.get('default_agent', 'Cartman') != 'Cartman':
+        raise ValueError('Project override conflicts with scaffold default_agent Cartman')
     agents = overrides.get('agents', {})
     if not isinstance(agents, dict):
         raise ValueError('Project agents override must be an object')
-    coordinators = ('Arbiter', 'build')
+    coordinators = ('Cartman', 'build')
     # Both entry points are the same coordinator. Do not silently lose a stricter
-    # project rule when Desktop chooses build instead of the explicit Arbiter role.
+    # project rule when Desktop chooses build instead of the explicit Cartman role.
     coordinator_permissions = []
     for role in coordinators:
         custom = agents.get(role, {})
@@ -33,7 +33,7 @@ def validate_overrides(target, defaults, overrides=None):
             raise ValueError(f'Invalid project override for {role}')
         coordinator_permissions.append(custom.get('permissions', []))
     if coordinator_permissions[0] != coordinator_permissions[1]:
-        raise ValueError('Mirror coordinator permission overrides in agents.Arbiter.permissions and agents.build.permissions before updating or dispatching')
+        raise ValueError('Mirror coordinator permission overrides in agents.Cartman.permissions and agents.build.permissions before updating or dispatching')
     global_rules = overrides.get('permissions', [])
     if not isinstance(global_rules, list) or any(
             not isinstance(r, dict) or not all(isinstance(r.get(k), str) for k in ('action', 'resource', 'effect'))
@@ -53,9 +53,9 @@ def validate_overrides(target, defaults, overrides=None):
         custom = agents.get(role, {})
         if not isinstance(custom, dict):
             raise ValueError(f'Invalid project override for {role}')
-        if role in (*coordinators, 'Sentry') and custom.get('model', shared['model']) != shared['model']:
+        if role in (*coordinators, 'Stan') and custom.get('model', shared['model']) != shared['model']:
             raise ValueError(f'Project override conflicts with pinned {role} model')
-        if role in (*coordinators, 'SCV', 'probe', 'Overlord', 'Sentry'):
+        if role in (*coordinators, 'Butters', 'Kyle', 'Stan'):
             mode = 'primary' if role in coordinators else 'subagent'
             if custom.get('disabled') or custom.get('mode', mode) != mode:
                 raise ValueError(f'Project override disables or changes required role {role}')
@@ -69,11 +69,11 @@ def validate_overrides(target, defaults, overrides=None):
                 raise ValueError(f'Invalid permission override for {role}')
             if rule['effect'] not in ('allow', 'ask', 'deny'):
                 raise ValueError(f'Invalid permission effect for {role}')
-            if role == 'Sentry' and rule['effect'] != 'deny' and any(
+            if role == 'Stan' and rule['effect'] != 'deny' and any(
                     fnmatchcase(action, rule['action']) for action in
                     ('edit', 'shell', 'execute', 'subagent', 'external_directory')):
-                raise ValueError('Project override weakens Sentry read-only permissions')
-            if role in ('SCV', 'probe', 'Overlord') and rule['effect'] != 'deny' and fnmatchcase('subagent', rule['action']):
+                raise ValueError('Project override weakens Stan read-only permissions')
+            if role in ('Butters', 'Kyle') and rule['effect'] != 'deny' and fnmatchcase('subagent', rule['action']):
                 raise ValueError(f'Project override enables delegation for {role}')
         # Native role rules follow global rules. Refuse a shadowed project denial
         # rather than claiming that leaving the override file intact preserves it.
@@ -93,10 +93,10 @@ def validate_overrides(target, defaults, overrides=None):
                 if fnmatchcase(action, rule['action']) and fnmatchcase(resource, rule['resource']):
                     effect = rule['effect']
             return effect
-        if role in (*coordinators, 'SCV', 'probe', 'Overlord', 'Sentry', 'title', 'summary', 'compaction'):
+        if role in (*coordinators, 'Butters', 'Kyle', 'Stan', 'title', 'summary', 'compaction'):
             if decision('external_directory', '*') == 'allow':
                 raise ValueError(f'Project override grants unrestricted external access to {role}; use explicitly authorized scoped paths')
-        if role in ('SCV', 'probe', 'Overlord'):
+        if role in ('Butters', 'Kyle'):
             for path in sorted(protected):
                 for resource in (path, str(target.resolve() / path)):
                     if decision('edit', resource) == 'allow':
@@ -107,8 +107,8 @@ def validate_overrides(target, defaults, overrides=None):
             for child in sorted(children):
                 if decision('subagent', child) != 'allow':
                     raise ValueError(f'Project override blocks {role} delegation to {child}; reconcile it explicitly')
-        elif role == 'Sentry':
+        elif role == 'Stan':
             for action in ('edit', 'shell', 'execute', 'subagent', 'external_directory'):
                 if decision(action, '*') != 'deny':
-                    raise ValueError(f'Project override weakens Sentry {action} denial')
+                    raise ValueError(f'Project override weakens Stan {action} denial')
     return overrides

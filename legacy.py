@@ -4,15 +4,16 @@ from fnmatch import fnmatchcase
 import hashlib
 import json
 from pathlib import Path
+from roles import RENAMES, RETIRED, rename_overrides
 
 
-def plan(target, contents, catalog, defaults, check_path):
+def plan(target, contents, catalog, defaults, check_path, ownership=None):
     """Return writes/ownership/messages; never write or infer Markdown semantics."""
     config_path = target / '.opencode/opencode.json'
     if not config_path.is_file():
         raise ValueError('No scaffold manifest or supported legacy .opencode/opencode.json; use newoc --here for an unscaffolded repository')
     if (target / 'opencode.json').exists():
-        raise ValueError('Missing scaffold manifest with an existing root opencode.json; ownership is ambiguous, no files changed')
+        raise ValueError('Legacy adoption with an existing root opencode.json is ambiguous; no files changed')
     for path in ['opencode.jsonc', '.opencode/opencode.jsonc']:
         if (target / path).exists():
             raise ValueError('Legacy JSONC configuration needs a reviewed conversion; no files changed')
@@ -21,6 +22,10 @@ def plan(target, contents, catalog, defaults, check_path):
     if not isinstance(old, dict):
         raise ValueError('Legacy configuration must be a JSON object')
     custom = deepcopy(old)
+    owned = ownership['files'] if ownership is not None else {}
+    exclusions = ownership.get('project_owned', []) if ownership is not None else []
+    if not isinstance(exclusions, list) or any(not isinstance(path, str) for path in exclusions) or set(exclusions) & set(owned):
+        raise ValueError('Invalid legacy ownership exclusions; no files changed')
     # Remove only recognized shared defaults. Everything else remains an override.
     for key in list(custom):
         if key not in ('agents', 'plugins', 'permissions', 'instructions') and custom[key] == defaults.get(key):
@@ -34,6 +39,8 @@ def plan(target, contents, catalog, defaults, check_path):
         roles.append('Sentry')
     for role in roles:
         path = target / f'.opencode/agents/{role}.md'
+        if str(path.relative_to(target)) in exclusions:
+            raise ValueError(f'Legacy role is explicitly project-owned: {path.relative_to(target)}; no files changed')
         check_path(target, path)
         if not path.is_file():
             raise ValueError(f'Incomplete legacy scaffold: missing {path.relative_to(target)}; no files changed')
@@ -41,6 +48,8 @@ def plan(target, contents, catalog, defaults, check_path):
         record = catalog['roles'].get(role, {}).get(fingerprint)
         if record is None:
             raise ValueError(f'Unrecognized/customized legacy role: {path.relative_to(target)}; refusing to overwrite it, no files changed')
+        if role == RETIRED:
+            continue
         override = agents.get(role, {})
         if not isinstance(override, dict):
             raise ValueError(f'Legacy {role} override must be an object')
@@ -48,10 +57,12 @@ def plan(target, contents, catalog, defaults, check_path):
         # retain precedence. Known shared permission lists are replaced as policy.
         settings = {**record['settings'], **override}
         agents[role] = {key: value for key, value in settings.items()
-                        if value != defaults['agents'][role].get(key,
+                        if value != defaults['agents'][RENAMES.get(role, role)].get(key,
                             'primary' if key == 'mode' and role == 'Arbiter' else
                             'subagent' if key == 'mode' else None)}
         messages.append(f'{role}: recognized {record["snapshot"]}; retain model/step overrides')
+    custom = rename_overrides(custom, target)
+    agents = custom.setdefault('agents', {})
     for role in list(agents):
         if not isinstance(agents[role], dict):
             raise ValueError(f'Legacy {role} override must be an object')
@@ -91,7 +102,7 @@ def plan(target, contents, catalog, defaults, check_path):
                    (fnmatchcase(rule['action'], base['action']) or fnmatchcase(base['action'], rule['action'])) and
                    (fnmatchcase(rule['resource'], base['resource']) or fnmatchcase(base['resource'], rule['resource']))
                    for base in settings.get('permissions', [])):
-                if role not in ('Arbiter', 'build'):
+                if role not in ('Cartman', 'build'):
                     raise ValueError(f'Legacy global permission conflicts with {role} policy; no files changed')
                 mirror_roles.add(role)
     for role in mirror_roles:
@@ -101,7 +112,7 @@ def plan(target, contents, catalog, defaults, check_path):
         # Preserve the complete ordered policy, including later allow exceptions.
         agents[role]['permissions'] = deepcopy(custom['permissions']) + role_rules
     # Desktop and explicit Arbiter are the same coordinator, including constraints.
-    arbiter_rules = agents.get('Arbiter', {}).get('permissions', [])
+    arbiter_rules = agents.get('Cartman', {}).get('permissions', [])
     build_rules = agents.get('build', {}).get('permissions', [])
     if arbiter_rules != build_rules:
         if original_build_rules:
@@ -113,26 +124,43 @@ def plan(target, contents, catalog, defaults, check_path):
     check_path(target, workflow)
     if not workflow.is_file():
         raise ValueError('Incomplete legacy scaffold: missing .opencode/WORKFLOW.md')
-    project = Path('.opencode/PROJECT.md')
-    if (target / project).exists():
-        project = Path('.opencode/LEGACY-PROJECT.md')
-    check_path(target, target / project)
     original = workflow.read_bytes()
-    if (target / project).exists() and (target / project).read_bytes() != original:
-        raise ValueError(f'Legacy project-policy destination collision: {project}; no files changed')
-    writes[project] = original
-    if str(project) not in defaults['instructions'] and str(project) not in custom['instructions']:
-        custom['instructions'].append(str(project))
+    workflow_hash = hashlib.sha256(original).hexdigest()
+    workflow_owned = (owned.get('.opencode/WORKFLOW.md') == workflow_hash and
+                      workflow_hash in catalog.get('shared_workflows', []))
+    if not workflow_owned:
+        project = Path('.opencode/PROJECT.md')
+        if (target / project).exists():
+            project = Path('.opencode/LEGACY-PROJECT.md')
+        check_path(target, target / project)
+        if (target / project).exists() and (target / project).read_bytes() != original:
+            raise ValueError(f'Legacy project-policy destination collision: {project}; no files changed')
+        writes[project] = original
+        if str(project) not in defaults['instructions'] and str(project) not in custom['instructions']:
+            custom['instructions'].append(str(project))
+        messages.append(f'WORKFLOW.md: preserve original bytes in {project}')
+    else:
+        messages.append('WORKFLOW.md: update owned shared policy; preserve project instructions separately')
     project_owned = []
     for relative, data in contents.items():
         path = target / relative
         check_path(target, path)
+        if str(relative) in owned and not path.is_file():
+            raise ValueError(f'Missing owned legacy file: {relative}; no files changed')
+        if str(relative) in exclusions:
+            if relative.name in ('WORKFLOW.md', 'BASELINE.md', 'preflight.py', 'roles.py', 'run-local.py') or '/agents/' in str(relative):
+                raise ValueError(f'Legacy exclusion hides shared orchestration: {relative}')
+            if not path.is_file():
+                raise ValueError(f'Missing legacy project-owned file: {relative}')
+            project_owned.append(str(relative))
+            continue
         if path.exists() and path.read_bytes() != data:
-            if str(relative).startswith('.opencode/plugins/'):
+            unchanged_owned = owned.get(str(relative)) == hashlib.sha256(path.read_bytes()).hexdigest()
+            if str(relative).startswith('.opencode/plugins/') and not unchanged_owned:
                 project_owned.append(str(relative))
                 messages.append(f'{relative}: preserved project-owned plugin')
                 continue
-            if relative not in {Path('.opencode/WORKFLOW.md'),
+            if not unchanged_owned and relative not in {Path('.opencode/WORKFLOW.md'),
                                 *[Path(f'.opencode/agents/{role}.md') for role in roles]}:
                 raise ValueError(f'Unowned legacy collision: {relative}; no files changed')
         if not path.exists() or path.read_bytes() != data:
@@ -140,5 +168,6 @@ def plan(target, contents, catalog, defaults, check_path):
     custom = {key: value for key, value in custom.items()
               if key not in ('agents', 'plugins', 'permissions', 'instructions') or value}
     writes[Path('.opencode/opencode.json')] = (json.dumps(custom, indent=2) + '\n').encode()
-    messages.append(f'WORKFLOW.md: preserve original bytes in {project}')
+    for role in roles:
+        writes[Path(f'.opencode/agents/{role}.md')] = None
     return writes, project_owned, custom, messages

@@ -1,9 +1,9 @@
-# Native Sol Arbiter + local OpenCode scaffold 4.2.0
+# Native Sol Cartman + local OpenCode scaffold 4.3.0
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
-OpenCode Arbiter**, local SCV/probe/Overlord subagents, a separate Sol **Sentry**
+OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
 reviewer, and optional Codex oversight.
-Arbiter owns the complete delegation, checkpoint, recovery and independent-QA loop.
+Cartman owns the complete delegation, checkpoint, recovery and independent-QA loop.
 It does not depend on a Codex chat polling or approving routine checkpoints.
 
 ```sh
@@ -21,6 +21,37 @@ models, applications, inference or project publication are started by setup.
 
 ## Ownership and routing
 
+### Character team and native-ID migration (4.3.0)
+
+The native IDs are now **Cartman** (coordinator), **Butters** (all behavior/UI
+implementation), **Kyle** (fresh independent local QA) and **Stan** (fresh independent
+read-only code review). Desktop `build` loads Cartman's policy. The separate probe
+builder is retired. Butters and Kyle retain their Swift local routes; Cartman and
+Stan retain Sol. Maintenance helpers retain their existing purpose and routes.
+
+Managed HANDOFFS.md supplies one brief character-style line at real assignments,
+acknowledgements, checkpoints and verdicts. It never replaces factual receipts,
+invented dialogue is forbidden, and no model calls are added to stage the characters.
+Plain/professional user instructions override the style. No live inference is
+required for configuration/update tests; actual delivery of the voice remains
+model behavior to observe in an authorized real session.
+
+`--update --apply` migrates unchanged owned role files and project JSON keys from
+Arbiter/SCV/Overlord/Sentry to Cartman/Butters/Kyle/Stan. Old managed files, including
+probe.md, are retired only after ownership/hash validation. Original role/config
+bytes are retained in private ignored role-ids recovery backups. Model and permission
+overrides move to the corresponding role; conflicting old/new overrides or custom
+probe policies stop before writes. The retired probe model/step override is no
+longer an implementation route. Project prose is not rewritten; the workflow
+explains old role labels. Ignored launcher profiles remain byte-for-byte intact:
+old SCV/Overlord model keys are accepted, and an old probe model can still supply the
+existing title helper route. The launcher's old Arbiter argument selects Cartman;
+resuming an old native session is not silently converted.
+
+Use the matching opencode-ship compatibility update before invoking `/ship` with
+the new team. It recognizes complete old and new teams, without requiring probe
+for the current team. A partial new team fails instead of falling back to old roles.
+
 | Layer | Files | Responsibility |
 | --- | --- | --- |
 | Shared orchestration | root `opencode.json`, `.opencode/BASELINE.md`, `.opencode/WORKFLOW.md`, `.opencode/agents/`, launcher and compatibility hook | Updated together; do not edit managed defaults |
@@ -28,11 +59,10 @@ models, applications, inference or project publication are started by setup.
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
-Arbiter is primary, pinned to `openai/gpt-6.1-sol`, and can dispatch only SCV,
-probe, Overlord and Sentry. All subagents have delegation denied. Default local
+Cartman is primary, pinned to `openai/gpt-6.1-sol`, and can dispatch only Butters, Kyle and Stan. All subagents have delegation denied. Default local
 worker model IDs match the current registered LM Studio choices: Swift1.5 Qwen3.8
-Splash for SCV/Overlord and Qwen3.6 35B A3B for probe. Summary/compaction use the
-local QA model; titles use the local presentation model. Arbiter and Sentry use cloud Sol.
+Splash for Butters/Kyle; Qwen3.6 35B A3B remains the title helper. Summary/compaction use the
+local QA model; titles use the local presentation model. Cartman and Stan use cloud Sol.
 Model IDs are editable repo defaults, not credentials or installed models.
 
 On another machine, register providers/models and set project overrides in
@@ -53,9 +83,9 @@ Credentials, private runtime data and unrelated archives are excluded by default
 Publication and other consequential operations still require task authorization.
 One active execution coordinator owns a task; do not run competing worker loops.
 
-Desktop's normal `build` primary entry loads the Arbiter policy through a native
-file reference to `.opencode/agents/Arbiter.md`; model, steps and bounded delegation
-defaults match the explicit Arbiter agent. No @mention, extra command or primary-agent
+Desktop's normal `build` primary entry loads the Cartman policy through a native
+file reference to `.opencode/agents/Cartman.md`; model, steps and bounded delegation
+defaults match the explicit Cartman agent. No @mention, extra command or primary-agent
 picker is required. Legacy scaffold status markers are not authorization or runtime
 gates. Verify effective routing when there is a concrete mismatch rather than
 repeating broad startup inventories. The optional launcher checks repository config
@@ -63,28 +93,28 @@ compatibility; it does not prove machine-global/session settings or endpoint loc
 
 ## Optional launcher and evidence
 
-Use `python3.12 .opencode/run-local.py Arbiter --task <repo-local-handoff>` to
+Use `python3.12 .opencode/run-local.py Cartman --task <repo-local-handoff>` to
 preview a launch; --doctor inspects native agent discovery without inference.
 Execution additionally requires --execute --routing-reviewed. Confirm the actual
 provider endpoints and merged config/plugins first: a provider ID does not prove
 a local endpoint. Do not start inference during a conflicting GPU workload.
 
-The launcher dispatches Arbiter only, supports resuming a known healthy Arbiter
+The launcher dispatches Cartman only, supports resuming a known healthy Cartman
 session in the same checkout, retains process exits/raw logs and holds a checkout
-lock. Inspect a stale lock's PID/native session before removing it. Fresh Overlord and Sentry
-sessions remain Arbiter's responsibility. There is no --auto, resident Codex
+lock. Inspect a stale lock's PID/native session before removing it. Fresh Kyle and Stan
+sessions remain Cartman's responsibility. There is no --auto, resident Codex
 supervisor, hard runtime timeout or machine-validated verdict receipt. Exit0 is
 not QA acceptance; source identity, executed gates and test counts/skips matter.
 Permissions are not OS containment, especially with shell access.
 
 ## Session repository scope (4.2.0)
 
-Arbiter, the Desktop build entry and all workers confirm the session's recorded
+Cartman, the Desktop build entry and all workers confirm the session's recorded
 absolute directory and resolved repository root before source access or edits.
 Every handoff includes that root and `.opencode/evidence/<task>/`. The selected
 checkout remains authoritative; a Codex handoff never implicitly selects
 `~/.codex/worktrees/`. A mismatched root is a checkpoint, not permission to move
-the session. The optional launcher explicitly creates (or retrieves) an Arbiter
+the session. The optional launcher explicitly creates (or retrieves) an Cartman
 session, verifies its recorded location before submitting a task, and retains a
 small handoff receipt and process log in a task directory under ignored evidence.
 Preview and doctor still start no inference; preview creates no sessions.
@@ -106,17 +136,17 @@ protection against ordinary staging, not a prohibition enforced by Git itself.
 
 Accessing another checkout or external historical evidence, creating an external
 worktree, or changing session directory requires explicit path/purpose approval.
-Arbiter arranges foreseeable approvals before an unattended batch. Unexpected
+Cartman arranges foreseeable approvals before an unattended batch. Unexpected
 access needs produce an honest checkpoint. Workers keep external access denied;
-Arbiter can supply bounded facts from explicitly authorized external sources.
+Cartman can supply bounded facts from explicitly authorized external sources.
 Authorization alone does not override a native deny; permission changes require
 explicit review before dispatch. No copying or relocation of old evidence is
 automatic, and "work autonomously" does not broaden access.
 
-Supported ordered `permissions` rules ask for Arbiter/build external-directory
-access and deny it for workers/helpers. SCV/probe cannot edit root JSON/JSONC or
+Supported ordered `permissions` rules ask for Cartman/build external-directory
+access and deny it for workers/helpers. Butters cannot edit root JSON/JSONC or
 `.opencode/` orchestration through edit tools; evidence remains writable.
-Overlord can edit only evidence; Sentry remains read-only. The compatibility
+Kyle can edit only evidence; Stan remains read-only. The compatibility
 checker rejects unrestricted external grants and worker overrides that freely
 edit protected orchestration. Existing conflicting overrides are preserved and
 reported for review, not silently rewritten. Native project overrides, plugins,
@@ -232,9 +262,9 @@ Example project-owned `.opencode/opencode.json`:
 ```json
 {
   "agents": {
-    "SCV": {"model": "lmstudio/project-worker", "steps": 24},
+    "Butters": {"model": "lmstudio/project-worker", "steps": 24},
     "compaction": {"model": "openai/gpt-6.1-sol"},
-    "Arbiter": {
+    "Cartman": {
       "permissions": [{"action": "shell", "resource": "git push*", "effect": "deny"}]
     },
     "build": {
@@ -254,7 +284,7 @@ or register models. Native discovery remains necessary after changing overrides.
 
 The two coordinator entry points share one prompt file. Their native JSON default
 permissions/models are kept aligned by regression checks. Mirror any project
-coordinator permission overrides under both `agents.Arbiter` and `agents.build`;
+coordinator permission overrides under both `agents.Cartman` and `agents.build`;
 updates/dispatch stop on asymmetric rules rather than silently changing access.
 This may require a reviewed edit to an existing project's overrides before update;
 the updater never rewrites those overrides. Other subagents retain their existing
@@ -262,7 +292,7 @@ local routes and delegation denials.
 
 Role permissions are evaluated after global permissions: place stricter role rules
 in `agents.<role>.permissions`. The updater refuses recognized shadowed global denies,
-blocked required delegation, disabled core roles, weakened Sentry permissions and
+blocked required delegation, disabled core roles, weakened Stan permissions and
 conflicting pinned cloud routes before writing. This is a focused compatibility
 check, not a complete OpenCode schema validator or proof of arbitrary glob-policy
 containment. Use native discovery to verify the effective result. Supported overrides
@@ -335,31 +365,46 @@ smoke task when inference is authorized and GPU capacity is available.
 
 ## Publication and acceptance policy (4.1.1)
 
-Shared configuration denies Git pushes for workers and helpers. Only the coordinator (Arbiter or its Desktop build entry) preapproves canonical single-branch pushes to `origin/codex/*`, optionally with `-u` or `--set-upstream`, after explicit task authorization. Other destinations/forms, multiple refs and colon refspecs still ask; the agent must verify the target is not the default/protected branch. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Explicit shipping authorization covers delivery through merge when QA, review and required checks pass; human acceptance is required for affected manual criteria or explicit project sign-off rules, not a generic second approval. Existing project rules are never rewritten. Routine startup uses bounded repository inspection and native delegation; runtime/provider discovery is reserved for concrete failures or explicit diagnostics. Existing projects require an explicit reviewed update.
+Shared configuration denies Git pushes for workers and helpers. Only the coordinator (Cartman or its Desktop build entry) preapproves canonical single-branch pushes to `origin/codex/*`, optionally with `-u` or `--set-upstream`, after explicit task authorization. Other destinations/forms, multiple refs and colon refspecs still ask; the agent must verify the target is not the default/protected branch. Force/mirror pushes and remote-ref deletion remain denied. This does not authorize publication or waive the project's PR, CI and human-acceptance gates. Shell permission patterns are best-effort checks, not OS containment. Explicit shipping authorization covers delivery through merge when QA, review and required checks pass; human acceptance is required for affected manual criteria or explicit project sign-off rules, not a generic second approval. Existing project rules are never rewritten. Routine startup uses bounded repository inspection and native delegation; runtime/provider discovery is reserved for concrete failures or explicit diagnostics. Existing projects require an explicit reviewed update.
 
 
-## Sentry code review (3.1.0)
+## Stan code review (3.1.0)
 
-Overlord retains independent local source assessment and executed QA. Sentry is a
+Kyle retains independent local source assessment and executed QA. Stan is a
 fresh, read-only `openai/gpt-6.1-sol` subagent for final code review, with shell,
-edits, nested execution and delegation denied. Arbiter supplies a bounded diff,
-relevant paths, original acceptance, revision identities and QA evidence. Sentry
+edits, nested execution and delegation denied. Cartman supplies a bounded diff,
+relevant paths, original acceptance, revision identities and QA evidence. Stan
 returns concrete findings and PASS/FAIL/BLOCKED; it never repairs or publishes.
-Arbiter routes repairs to SCV/probe and obtains fresh QA/review after changes.
-Project cloud-source authorization applies to Sentry too. No extra coordinator or
+Cartman routes repairs to Butters and obtains fresh QA/review after changes.
+Project cloud-source authorization applies to Stan too. No extra coordinator or
 continuous Codex supervision is introduced.
 
-Example instruction to Arbiter:
+Example instruction to Cartman:
 
-> Commit the scoped changes, push the branch, create a PR, and have Sentry review
+> Commit the scoped changes, push the branch, create a PR, and have Stan review
 > its exact head commit. Address supported findings through the builders, obtain
-> Overlord QA and fresh Sentry review after fixes, and record the review using the
+> Kyle QA and fresh Stan review after fixes, and record the review using the
 > project's existing gate. Leave the PR open for my acceptance; do not merge.
 
 Publication still requires task authorization/native approval and project gates.
 A receipt is valid only for its reviewed PR head. A pre-commit review must match
-the committed tree or be repeated. Sentry PASS is not human approval or permission
+the committed tree or be repeated. Stan PASS is not human approval or permission
 to merge. In the 4.x layout, compatible scaffold updates install role definitions and native
 routing together; project-owned AGENTS.md/README.md do not need role-description
 merges. Recognized pre-manifest native layouts can be adopted through --update;
 other legacy/custom layouts fail safely for an explicit ownership review.
+
+### Tracked native v3 adoption
+
+Recognized native 3.x manifests without a layout marker can also use --update.
+Unchanged owned helper/template files are replaced using their recorded hashes;
+modified helpers refuse, and modified plugins remain project-owned. Native role
+files still require exact known fingerprints, including historical variants whose
+external boundary is configured in project JSON. No arbitrary role edits are
+adopted. Models and ordered JSON access rules survive the ID migration unchanged.
+Only an owned, fingerprint-known shared workflow is replaced without loading its
+old generic rules as project instructions. Unknown/custom workflows are preserved
+as project policy. Project-owned PROJECT.md, AGENTS.md, source, and Git state remain
+untouched; this does not start training, inference or inspect private datasets.
+The launcher validates the chosen title helper model as local, including a legacy
+probe title override, and otherwise preserves the native title route.
