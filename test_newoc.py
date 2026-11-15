@@ -126,6 +126,11 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout)['runtime_config']['agents']['title']['model'],
                          json.loads((p/'opencode.json').read_text())['agents']['title']['model'])
+        (p/'.opencode/opencode.json').write_text(json.dumps({'agents':{'title':{'model':'lmstudio/project-title'}}}))
+        local=json.loads(profile.read_text());local['models'].pop('title');profile.write_text(json.dumps(local))
+        result=subprocess.run(args,capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout)['runtime_config']['agents']['title']['model'],'lmstudio/project-title')
         profile.write_text(json.dumps({'local_provider_ids':['lmstudio'],'models':{
             'SCV':'lmstudio/local','Overlord':'lmstudio/local','probe':'openai/gpt-6.1-sol'}}))
         result=subprocess.run(args,capture_output=True,text=True)

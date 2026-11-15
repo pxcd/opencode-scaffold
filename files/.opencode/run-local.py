@@ -40,13 +40,13 @@ def verified_session(root, env, session_id=None):
 def routing(root):
     native = json.loads((root / 'opencode.json').read_text())
     overrides = validate_overrides(root, native)
+    native['agents'] = {**native['agents'], **{
+        role: {**native['agents'].get(role, {}), **settings}
+        for role, settings in overrides.get('agents', {}).items()}}
     profile_path = root / '.opencode/local.json'
     if profile_path.exists():
         profile = json.loads(profile_path.read_text())
     else:
-        native['agents'] = {**native['agents'], **{
-            role: {**native['agents'].get(role, {}), **settings}
-            for role, settings in overrides.get('agents', {}).items()}}
         profile = {
             'local_provider_ids': ['lmstudio'],
             'models': {role: native['agents'][role]['model'] for role in ROLES},
