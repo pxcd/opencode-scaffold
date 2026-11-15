@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.0
+# Native Sol Cartman + local OpenCode scaffold 4.3.1
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -60,9 +60,10 @@ for the current team. A partial new team fails instead of falling back to old ro
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
 Cartman is primary, pinned to `openai/gpt-6.1-sol`, and can dispatch only Butters, Kyle and Stan. All subagents have delegation denied. Default local
-worker model IDs match the current registered LM Studio choices: Swift1.5 Qwen3.8
-Splash for Butters/Kyle; Qwen3.6 35B A3B remains the title helper. Summary/compaction use the
-local QA model; titles use the local presentation model. Cartman and Stan use cloud Sol.
+worker and maintenance-helper model IDs use `lmstudio/swift-1.5-qwen3.8-27b-splash`
+for Butters, Kyle, title, summary and compaction. Cartman, its desktop `build` alias
+and Stan use cloud Sol. Project and ignored launcher overrides still take precedence;
+an update preserves them, so inspect effective routing when changing an existing project.
 Model IDs are editable repo defaults, not credentials or installed models.
 
 On another machine, register providers/models and set project overrides in
