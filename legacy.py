@@ -4,6 +4,7 @@ from fnmatch import fnmatchcase
 import hashlib
 import json
 from pathlib import Path
+from roles import RENAMES, RETIRED, rename_overrides
 
 
 def plan(target, contents, catalog, defaults, check_path):
@@ -41,6 +42,8 @@ def plan(target, contents, catalog, defaults, check_path):
         record = catalog['roles'].get(role, {}).get(fingerprint)
         if record is None:
             raise ValueError(f'Unrecognized/customized legacy role: {path.relative_to(target)}; refusing to overwrite it, no files changed')
+        if role == RETIRED:
+            continue
         override = agents.get(role, {})
         if not isinstance(override, dict):
             raise ValueError(f'Legacy {role} override must be an object')
@@ -48,10 +51,12 @@ def plan(target, contents, catalog, defaults, check_path):
         # retain precedence. Known shared permission lists are replaced as policy.
         settings = {**record['settings'], **override}
         agents[role] = {key: value for key, value in settings.items()
-                        if value != defaults['agents'][role].get(key,
+                        if value != defaults['agents'][RENAMES.get(role, role)].get(key,
                             'primary' if key == 'mode' and role == 'Arbiter' else
                             'subagent' if key == 'mode' else None)}
         messages.append(f'{role}: recognized {record["snapshot"]}; retain model/step overrides')
+    custom = rename_overrides(custom, target)
+    agents = custom.setdefault('agents', {})
     for role in list(agents):
         if not isinstance(agents[role], dict):
             raise ValueError(f'Legacy {role} override must be an object')
@@ -91,7 +96,7 @@ def plan(target, contents, catalog, defaults, check_path):
                    (fnmatchcase(rule['action'], base['action']) or fnmatchcase(base['action'], rule['action'])) and
                    (fnmatchcase(rule['resource'], base['resource']) or fnmatchcase(base['resource'], rule['resource']))
                    for base in settings.get('permissions', [])):
-                if role not in ('Arbiter', 'build'):
+                if role not in ('Cartman', 'build'):
                     raise ValueError(f'Legacy global permission conflicts with {role} policy; no files changed')
                 mirror_roles.add(role)
     for role in mirror_roles:
@@ -101,7 +106,7 @@ def plan(target, contents, catalog, defaults, check_path):
         # Preserve the complete ordered policy, including later allow exceptions.
         agents[role]['permissions'] = deepcopy(custom['permissions']) + role_rules
     # Desktop and explicit Arbiter are the same coordinator, including constraints.
-    arbiter_rules = agents.get('Arbiter', {}).get('permissions', [])
+    arbiter_rules = agents.get('Cartman', {}).get('permissions', [])
     build_rules = agents.get('build', {}).get('permissions', [])
     if arbiter_rules != build_rules:
         if original_build_rules:
@@ -140,5 +145,7 @@ def plan(target, contents, catalog, defaults, check_path):
     custom = {key: value for key, value in custom.items()
               if key not in ('agents', 'plugins', 'permissions', 'instructions') or value}
     writes[Path('.opencode/opencode.json')] = (json.dumps(custom, indent=2) + '\n').encode()
+    for role in roles:
+        writes[Path(f'.opencode/agents/{role}.md')] = None
     messages.append(f'WORKFLOW.md: preserve original bytes in {project}')
     return writes, project_owned, custom, messages

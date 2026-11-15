@@ -22,6 +22,7 @@ STARTER_HISTORY = TEMPLATE.parent / 'starter-history'
 # The same checker is shipped into projects for dispatch-time validation.
 sys.path.insert(0, str(TEMPLATE / '.opencode'))
 from preflight import validate_overrides
+from roles import RENAMES, RETIRED, rename_overrides
 
 
 def managed(relative):
@@ -57,7 +58,10 @@ def apply_files(target, changes, new_mode=None):
     try:
         for path, data in changes:
             completed.append(path)
-            atomic_write(path, data, previous[path][1] if previous[path][1] is not None else new_mode)
+            if data is None:
+                path.unlink(missing_ok=True)
+            else:
+                atomic_write(path, data, previous[path][1] if previous[path][1] is not None else new_mode)
     except BaseException as error:
         failures = []
         for path in reversed(completed):
@@ -80,6 +84,18 @@ def template_files():
     # Finder metadata and Python's import caches are not template source.
     return sorted(p for p in TEMPLATE.rglob('*') if p.is_file() and p.name != '.DS_Store'
                   and '__pycache__' not in p.relative_to(TEMPLATE).parts)
+
+
+def recovery_copies(target, originals, label):
+    identity = digest(json.dumps({name: digest(data) for name, data in sorted(originals.items())}).encode())
+    root = target / '.opencode/scaffold-backups' / (label + '-' + identity)
+    copies = [(root / '.gitignore', b'*\n')]
+    copies.extend((root / 'files' / name, data) for name, data in originals.items())
+    for path, data in copies:
+        safe_update_destination(target, path)
+        if path.exists() and path.read_bytes() != data:
+            raise ValueError('Scaffold recovery backup collision; no files changed')
+    return copies
 
 
 def manifest(contents, project_owned=(), starter=None):
@@ -218,12 +234,28 @@ def update(target, apply=False):
     if any(str(p) in project_owned for p in [Path('opencode.json'), Path('.opencode/BASELINE.md'), Path('.opencode/WORKFLOW.md'), Path('.opencode/run-local.py'), Path('.opencode/preflight.py'),
                                            *[p.relative_to(TEMPLATE) for p in (TEMPLATE/'.opencode/agents').glob('*.md')]]):
         raise ValueError('Shared orchestration cannot be project-owned in this layout; use project config overrides')
-    validate_overrides(target, json.loads(contents[Path('opencode.json')]))
+    override_path = target / OVERRIDES
+    safe_update_destination(target, override_path)
+    original_overrides = override_path.read_bytes() if override_path.exists() else None
+    parsed_overrides = json.loads(original_overrides) if original_overrides is not None else {}
+    retired_paths = {f'.opencode/agents/{role}.md' for role in [*RENAMES, RETIRED]}
+    overrides = rename_overrides(parsed_overrides, target) if retired_paths & set(old['files']) else parsed_overrides
+    validate_overrides(target, json.loads(contents[Path('opencode.json')]), overrides)
     # No implicit deletion or adoption of existing unmanaged files.
     old_files = {p: h for p, h in old['files'].items() if Path(p).name != '.DS_Store'}
-    if set(old_files) - {str(p) for p in contents}:
+    removed = set(old_files) - {str(p) for p in contents}
+    if removed - retired_paths:
         raise ValueError('Template removed managed files; a reviewed migration is required')
     changes = []
+    for name in sorted(retired_paths):
+        path = target / name
+        safe_update_destination(target, path)
+        if path.exists() and name not in old_files:
+            raise ValueError(f'Unowned legacy role cannot be retired automatically: {name}')
+        if name in removed:
+            if not path.is_file() or digest(path.read_bytes()) != old_files[name]:
+                raise ValueError(f'Locally changed managed role; refusing to retire: {name}')
+            changes.append((path, None))
     for relative, data in contents.items():
         destination = target / relative
         safe_update_destination(target, destination)
@@ -235,6 +267,11 @@ def update(target, apply=False):
             raise ValueError(f'Refusing to adopt existing file: {relative}')
         if not destination.exists() or destination.read_bytes() != data:
             changes.append((destination, data))
+    if overrides != parsed_overrides:
+        changes.append((override_path, (json.dumps(overrides, indent=2)+'\n').encode()))
+    originals = {str(path.relative_to(target)): path.read_bytes() for path, data in changes
+                 if path.exists() and (data is None or path == override_path)}
+    copies = recovery_copies(target, originals, 'role-ids') if originals else []
     instruction_change, starter, backup, instruction_status = instruction_update(target, old)
     if instruction_change is not None:
         changes.append(instruction_change)
@@ -247,9 +284,11 @@ def update(target, apply=False):
         changes.append((ignore_path, ignore + separator + b'/.opencode/evidence/\n'))
     print(f'Scaffold {old["version"]} -> {VERSION}: {len(changes)} file changes; '+('applying' if apply else 'preview only'), file=sys.stderr)
     for destination, data in changes:
-        print(f'  {destination.relative_to(target)}', file=sys.stderr)
+        print(f'  {"remove " if data is None else ""}{destination.relative_to(target)}', file=sys.stderr)
     print(f'  AGENTS.md: {instruction_status}', file=sys.stderr)
     if apply:
+        if copies:
+            apply_files(target, copies, new_mode=0o600)
         if backup is not None:
             backup_path, previous = backup
             backup_path.parent.mkdir(parents=True, exist_ok=True)
@@ -289,22 +328,7 @@ def legacy_update(target, apply=False):
         safe_update_destination(target, path)
         if path.exists() and path.read_bytes() != data:
             originals[str(relative)] = path.read_bytes()
-    identity = digest(json.dumps({name: digest(data) for name, data in sorted(originals.items())}).encode())
-    backup_root = target / '.opencode/scaffold-backups' / ('legacy-' + identity)
-    backups = []
-    backup_ignore = backup_root / '.gitignore'
-    safe_update_destination(target, backup_ignore)
-    if backup_ignore.exists() and backup_ignore.read_bytes() != b'*\n':
-        raise ValueError('Legacy migration backup ignore collision; no files changed')
-    # Recovery copies remain ignored even if the project's root-ignore write
-    # fails and rollback restores a root file without an evidence rule.
-    backups.append((backup_ignore, b'*\n'))
-    for name, data in originals.items():
-        path = backup_root / 'files' / name
-        safe_update_destination(target, path)
-        if path.exists() and path.read_bytes() != data:
-            raise ValueError('Legacy migration backup collision; no files changed')
-        backups.append((path, data))
+    backups = recovery_copies(target, originals, 'legacy')
     print(f'Legacy native scaffold -> {VERSION}: '+('applying' if apply else 'preview only'), file=sys.stderr)
     for message in messages:
         print('  ' + message, file=sys.stderr)

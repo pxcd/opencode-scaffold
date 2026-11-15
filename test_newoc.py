@@ -15,7 +15,7 @@ FAKE_SESSION_API = """#!/usr/bin/env python3.12
 import json, os, sys
 from pathlib import Path
 if 'api' in sys.argv:
-    print(json.dumps({'data': {'id': 'ses_scope_fixture', 'agent': 'Arbiter',
+    print(json.dumps({'data': {'id': 'ses_scope_fixture', 'agent': 'Cartman',
         'location': {'directory': os.environ.get('FAKE_SESSION_DIRECTORY', os.environ['PWD'])}}}))
     raise SystemExit(0)
 """
@@ -109,7 +109,7 @@ class ScaffoldTests(unittest.TestCase):
         config.write_text(json.dumps(data))
         result=self.run_tool('--update','--apply',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
         effective=json.loads((p/'opencode.json').read_text());overrides=json.loads(config.read_text())
-        for role in ['Arbiter','build']:
+        for role in ['Cartman','build']:
             rules=[*effective['permissions'],*overrides['permissions'],
                    *effective['agents'][role]['permissions'],*overrides['agents'][role]['permissions']]
             for command,wanted in [('git status --short','allow'),('touch unrelated','deny')]:
@@ -120,18 +120,18 @@ class ScaffoldTests(unittest.TestCase):
         p=self.legacy_fixture();config=p/'.opencode/opencode.json'
         data=json.loads(config.read_text())
         data['permissions'].append({'action':'shell','resource':'*','effect':'deny'})
-        for role in ['Arbiter','build']:
+        for role in ['Cartman','build']:
             data['agents'][role]={'permissions':[{'action':'shell','resource':'git status*','effect':'allow'}]}
         config.write_text(json.dumps(data))
         result=self.run_tool('--update','--apply',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
         overrides=json.loads(config.read_text())
-        for role in ['Arbiter','build']:
+        for role in ['Cartman','build']:
             matches=[r['effect'] for r in overrides['agents'][role]['permissions']
                      if r['action']=='shell' and fnmatchcase('git status --short',r['resource'])]
             self.assertEqual(matches[-1],'allow')
 
     def test_legacy_conflicts_and_malformed_inputs_have_no_partial_writes(self):
-        cases=[('.opencode/agents/SCV.md','custom role body\n'),
+        cases=[('.opencode/agents/Butters.md','custom role body\n'),
                ('.opencode/opencode.json','{ malformed JSON'),
                ('.opencode/opencode.json','[]'),
                ('opencode.json','{}'),
@@ -207,7 +207,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(self.git(p,'branch','--show-current'),'main')
         self.assertFalse(self.git(p,'remote'))
         self.assertNotEqual(subprocess.run(['git','-C',str(p),'rev-parse','HEAD'],capture_output=True).returncode,0)
-        for role in ['Arbiter','SCV','Overlord','probe','Sentry']:
+        for role in ['Cartman','Butters','Kyle','Stan']:
             self.assertEqual((p/f'.opencode/agents/{role}.md').read_bytes(),(HERE/f'files/.opencode/agents/{role}.md').read_bytes())
         self.assertIn('# example project instructions',(p/'AGENTS.md').read_text())
         manifest=json.loads((p/'.opencode/scaffold.json').read_text())
@@ -216,17 +216,87 @@ class ScaffoldTests(unittest.TestCase):
                          hashlib.sha256((p/'AGENTS.md').read_bytes()).hexdigest())
         self.assertIn('.opencode/BASELINE.md',manifest['files'])
         self.assertFalse((p/'Sources').exists())
-        self.assertTrue((p/'.opencode/agents/Arbiter.md').exists())
+        self.assertTrue((p/'.opencode/agents/Cartman.md').exists())
         config=json.loads((p/'opencode.json').read_text())
-        self.assertEqual(config['default_agent'],'Arbiter')
+        self.assertEqual(config['default_agent'],'Cartman')
         self.assertIn('.opencode/BASELINE.md',config['instructions'])
-        self.assertEqual(config['agents']['Arbiter']['model'],'openai/gpt-6.1-sol')
-        self.assertIn('mode: primary',(p/'.opencode/agents/Arbiter.md').read_text())
-        for role in ['SCV','probe','Overlord']:
+        self.assertEqual(config['agents']['Cartman']['model'],'openai/gpt-6.1-sol')
+        self.assertIn('mode: primary',(p/'.opencode/agents/Cartman.md').read_text())
+        for role in ['Butters','Kyle']:
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
             self.assertTrue(config['agents'][role]['model'].startswith('lmstudio/'))
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
         self.assertFalse(list(p.rglob('__pycache__')))
+
+    def test_tracked_role_id_upgrade_preserves_overrides_and_retires_ui_builder(self):
+        import shutil
+        self.assertEqual(self.run_tool('old-team','--root',str(self.root)).returncode,0)
+        p=self.root/'old-team';meta_path=p/'.opencode/scaffold.json'
+        meta=json.loads(meta_path.read_text())
+        for role in ['Cartman','Butters','Kyle','Stan']:
+            relative=f'.opencode/agents/{role}.md';(p/relative).unlink();meta['files'].pop(relative)
+        for role in ['Arbiter','SCV','probe','Overlord','Sentry']:
+            relative=f'.opencode/agents/{role}.md';data=('Historical managed '+role+' policy\n').encode()
+            (p/relative).write_bytes(data);meta['files'][relative]=hashlib.sha256(data).hexdigest()
+        for relative in ['.opencode/HANDOFFS.md','.opencode/roles.py']:
+            (p/relative).unlink();meta['files'].pop(relative)
+        meta['version']='4.2.0';meta_path.write_text(json.dumps(meta))
+        rules=[{'action':'shell','resource':'git push*','effect':'deny'}]
+        overrides={'default_agent':'Arbiter','agents':{'SCV':{'model':'lmstudio/project-worker'},
+            'Arbiter':{'permissions':rules},'build':{'permissions':rules},
+            'probe':{'model':'lmstudio/old-ui'}},'instructions':['POLICY.md']}
+        config=p/'.opencode/opencode.json';config.write_text(json.dumps(overrides))
+        profile=p/'.opencode/local.json';profile.write_text(json.dumps({'local_provider_ids':['lmstudio'],
+            'models':{'SCV':'lmstudio/project-worker','Overlord':'lmstudio/project-qa','probe':'lmstudio/old-ui'}}))
+        (p/'AGENTS.md').write_text('Project-specific acceptance stays unchanged.\n')
+        before=self.snapshot(p);original_profile=profile.read_bytes()
+        result=self.run_tool('--update',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(self.snapshot(p),before)
+        self.assertIn('remove .opencode/agents/probe.md',result.stderr)
+        result=self.run_tool('--update','--apply',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
+        config_data=json.loads(config.read_text())
+        self.assertEqual(config_data['default_agent'],'Cartman')
+        self.assertEqual(config_data['agents']['Butters']['model'],'lmstudio/project-worker')
+        self.assertEqual(config_data['agents']['Cartman']['permissions'],rules)
+        self.assertNotIn('SCV',config_data['agents']);self.assertNotIn('probe',config_data['agents'])
+        for role in ['Arbiter','SCV','probe','Overlord','Sentry']:
+            self.assertFalse((p/f'.opencode/agents/{role}.md').exists())
+        self.assertEqual(profile.read_bytes(),original_profile)
+        self.assertEqual((p/'AGENTS.md').read_bytes(),before['AGENTS.md'])
+        result=subprocess.run(['python3.12',str(p/'.opencode/run-local.py'),'--task',str(p/'AGENTS.md')],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        runtime=json.loads(result.stdout)['runtime_config']['agents']
+        self.assertEqual(runtime['Butters']['model'],'lmstudio/project-worker')
+        self.assertEqual(runtime['Kyle']['model'],'lmstudio/project-qa')
+        result=self.run_tool('--update',cwd=p);self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('0 file changes',result.stderr)
+        backup=next((p/'.opencode/scaffold-backups').glob('role-ids-*'))
+        self.assertEqual((backup/'files/.opencode/agents/probe.md').read_bytes(),before['.opencode/agents/probe.md'])
+        self.assertEqual((backup/'files/.opencode/opencode.json').read_bytes(),before['.opencode/opencode.json'])
+
+    def test_role_migration_preserves_custom_ids_and_bound_file_denials(self):
+        import newoc
+        from roles import rename_overrides
+        custom={'agents':{'ArbiterAudit':{'mode':'subagent'}},'permissions':[
+            {'action':'subagent','resource':'ArbiterAudit','effect':'deny'},
+            {'action':'subagent','resource':'SCV','effect':'allow'},
+            {'action':'edit','resource':'.opencode/agents/SCV.md','effect':'deny'},
+            {'action':'*','resource':str(self.root/'.opencode/agents/Sentry.md'),'effect':'deny'}]}
+        result=rename_overrides(custom,self.root)
+        self.assertIn('ArbiterAudit',result['agents'])
+        self.assertEqual([r['resource'] for r in result['permissions']],
+                         ['ArbiterAudit','Butters','.opencode/agents/Butters.md',str(self.root/'.opencode/agents/Stan.md')])
+        self.assertEqual(custom['permissions'][1]['resource'],'SCV')
+        self.assertEqual(rename_overrides(result,self.root),result)
+        for path in ['.opencode/agents/SCV.md','./.opencode/agents/SCV.md',str(self.root/'.opencode/agents/SCV.md')]:
+            old={'agents':{'SCV':{'system':'Policy: {file:'+path+'}'}}}
+            new=rename_overrides(old,self.root)
+            self.assertEqual(new['agents']['Butters']['system'],'Policy: {file:'+path.replace('SCV.md','Butters.md')+'}')
+        with self.assertRaisesRegex(ValueError,'retired probe'):
+            rename_overrides({'agents':{'Extra':{'system':'{file:.opencode/agents/probe.md}'}}},self.root)
+        for action,resource in [('subagent','Arbiter*'),('sub*','SCV'),('edit','.opencode/agents/S*.md')]:
+            with self.assertRaisesRegex(ValueError,'Ambiguous'):
+                rename_overrides({'permissions':[{'action':action,'resource':resource,'effect':'deny'}]},self.root)
     def test_coordinator_push_permissions_are_scoped_to_single_feature_branch(self):
         config=json.loads((HERE/'files/opencode.json').read_text())
         def decision(role, command):
@@ -250,25 +320,25 @@ class ScaffoldTests(unittest.TestCase):
                 'git push origin +codex/task','git push --mirror origin',
                 'git push --delete origin codex/task','git push -d origin codex/task',
                 'git push origin :codex/task']
-        for role in ['Arbiter','build']:
+        for role in ['Cartman','build']:
             for effect,commands in [('allow',allowed),('ask',guarded),('deny',denied)]:
                 for command in commands:
                     with self.subTest(role=role,command=command):
                         self.assertEqual(decision(role,command),effect)
-        for role in ['SCV','probe','Overlord','Sentry','title','summary','compaction']:
+        for role in ['Butters','Kyle','Stan','title','summary','compaction']:
             for command in allowed:
                 with self.subTest(role=role,command=command):
                     self.assertEqual(decision(role,command),'deny')
 
     def test_desktop_entry_uses_bounded_coordinator_defaults(self):
         config=json.loads((HERE/'files/opencode.json').read_text())
-        desktop=config['agents']['build'];explicit=config['agents']['Arbiter']
-        self.assertEqual(desktop['system'],'{file:.opencode/agents/Arbiter.md}')
+        desktop=config['agents']['build'];explicit=config['agents']['Cartman']
+        self.assertEqual(desktop['system'],'{file:.opencode/agents/Cartman.md}')
         self.assertEqual(desktop['mode'],'primary')
         for field in ['model','steps','permissions']:
             self.assertEqual(desktop[field],explicit[field])
         self.assertIn({'action':'subagent','resource':'*','effect':'deny'},config['permissions'])
-        for role in ['SCV','probe','Overlord','Sentry']:
+        for role in ['Butters','Kyle','Stan']:
             self.assertIn({'action':'subagent','resource':'*','effect':'deny'},
                           config['agents'][role]['permissions'])
 
@@ -276,33 +346,33 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(self.run_tool('review', '--root', str(self.root)).returncode, 0)
         p = self.root/'review'
         config = json.loads((p/'opencode.json').read_text())
-        self.assertEqual(config['agents']['Sentry']['model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(config['agents']['Stan']['model'], 'openai/gpt-6.1-sol')
         def header(role):
             text = (p/f'.opencode/agents/{role}.md').read_text().removeprefix('---\n').split('\n---\n', 1)[0]
             return json.loads(subprocess.check_output(
                 ['ruby', '-ryaml', '-rjson', '-e', 'puts JSON.generate(YAML.safe_load(STDIN.read))'],
                 input=text, text=True))
-        sentry = header('Sentry')
+        sentry = header('Stan')
         self.assertEqual(sentry['mode'], 'subagent')
         for action in ['edit', 'shell', 'execute', 'subagent', 'external_directory']:
-            self.assertEqual([rule for rule in config['agents']['Sentry']['permissions'] if rule['action'] == action],
+            self.assertEqual([rule for rule in config['agents']['Stan']['permissions'] if rule['action'] == action],
                              [{'action': action, 'resource': '*', 'effect': 'deny'}])
-        self.assertIn({'action': 'subagent', 'resource': 'Sentry', 'effect': 'allow'},
-                      config['agents']['Arbiter']['permissions'])
-        self.assertIn('.opencode/agents/Sentry.md',
+        self.assertIn({'action': 'subagent', 'resource': 'Stan', 'effect': 'allow'},
+                      config['agents']['Cartman']['permissions'])
+        self.assertIn('.opencode/agents/Stan.md',
                       json.loads((p/'.opencode/scaffold.json').read_text())['files'])
         # An old local profile must not require or redirect the cloud reviewer.
         (p/'.opencode/local.json').write_text(json.dumps({
             'local_provider_ids': ['lmstudio'],
-            'models': {role: 'lmstudio/test' for role in ['SCV', 'probe', 'Overlord', 'Sentry']}}))
+            'models': {role: 'lmstudio/test' for role in ['Butters', 'Kyle', 'Stan']}}))
         (p/'task.md').write_text('Review fixture')
         preview = json.loads(subprocess.check_output([
             'python3.12', str(p/'.opencode/run-local.py'), '--task', str(p/'task.md')], text=True))
-        self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'], 'openai/gpt-6.1-sol')
 
     def test_builders_cannot_edit_managed_root_config(self):
         config=json.loads((HERE/'files/opencode.json').read_text())
-        for role in ['SCV','probe']:
+        for role in ['Butters']:
             for resource in ['opencode.json','*/opencode.json']:
                 self.assertIn({'action':'edit','resource':resource,'effect':'deny'},
                               config['agents'][role]['permissions'])
@@ -446,40 +516,40 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(self.run_tool('routing','--root',str(self.root)).returncode,0)
         p=self.root/'routing';task=p/'task.md';task.write_text('Controlled handoff')
         launcher=p/'.opencode/run-local.py'
-        args=['python3.12',str(launcher),'Arbiter','--task',str(task)]
+        args=['python3.12',str(launcher),'Cartman','--task',str(task)]
         self.assertEqual(subprocess.run(args,capture_output=True).returncode,0)
         native=json.loads((p/'opencode.json').read_text())
         native['agents']['compaction']['model']='openai/project-authorized-helper'
         (p/'.opencode/opencode.json').write_text(json.dumps({'agents': {'compaction': native['agents']['compaction']}}))
         preview=json.loads(subprocess.check_output(args,text=True))
         self.assertNotIn('compaction',preview['runtime_config']['agents'])
-        self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'],'openai/gpt-6.1-sol')
+        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.1-sol')
         self.assertNotIn('enabled_providers',preview['runtime_config'])
-        profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['SCV','probe','Overlord']}}
+        profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['Butters','Kyle']}}
         (p/'.opencode/local.json').write_text(json.dumps(profile))
         r=subprocess.run(args,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
         preview=json.loads(r.stdout)
-        self.assertEqual(set(preview['runtime_config']['agents']),{'Arbiter','SCV','probe','Overlord','Sentry','title','summary','compaction'})
-        self.assertEqual(preview['runtime_config']['agents']['Arbiter']['model'],'openai/gpt-6.1-sol')
-        self.assertEqual(preview['runtime_config']['agents']['Sentry']['model'],'openai/gpt-6.1-sol')
-        self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n not in ('Arbiter','Sentry')))
+        self.assertEqual(set(preview['runtime_config']['agents']),{'Cartman','Butters','Kyle','Stan','title','summary','compaction'})
+        self.assertEqual(preview['runtime_config']['agents']['Cartman']['model'],'openai/gpt-6.1-sol')
+        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.1-sol')
+        self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n not in ('Cartman','Stan')))
         self.assertIn('Codex intervention is optional',preview['argv'][-1])
         self.assertNotIn('--auto',preview['argv'])
         self.assertFalse((p/'.opencode/evidence').exists())
         r=subprocess.run(args+['--execute'],capture_output=True,text=True)
         self.assertNotEqual(r.returncode,0);self.assertIn('routing-reviewed',r.stderr)
-        args[2]='Overlord'
+        args[2]='Kyle'
         r=subprocess.run(args+['--session','old-session'],capture_output=True,text=True)
         self.assertNotEqual(r.returncode,0);self.assertIn('invalid choice',r.stderr)
 
     def test_worker_process_exit_and_lock_are_preserved_with_fake_cli(self):
         self.assertEqual(self.run_tool('dispatch','--root',str(self.root)).returncode,0)
         p=self.root/'dispatch';task=p/'task.md';task.write_text('Controlled fake dispatch')
-        (p/'.opencode/local.json').write_text(json.dumps({'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test' for r in ['SCV','probe','Overlord']}}))
+        (p/'.opencode/local.json').write_text(json.dumps({'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test' for r in ['Butters','Kyle']}}))
         bin_dir=self.root/'bin';bin_dir.mkdir();cli=bin_dir/'opencode'
         cli.write_text(FAKE_SESSION_API + 'print("fake-worker-result")\nprint("SESSION_PWD="+os.environ["PWD"])\nraise SystemExit(17)\n');cli.chmod(0o755)
         env={**os.environ,'PATH':str(bin_dir)+os.pathsep+os.environ['PATH']}
-        args=['python3.12',str(p/'.opencode/run-local.py'),'Arbiter','--task',str(task),'--execute','--routing-reviewed']
+        args=['python3.12',str(p/'.opencode/run-local.py'),'Cartman','--task',str(task),'--execute','--routing-reviewed']
         r=subprocess.run(args,env=env,text=True,capture_output=True)
         self.assertEqual(r.returncode,17,r.stderr)
         self.assertFalse((p/'.opencode/.worker.lock').exists())
@@ -517,7 +587,7 @@ class ScaffoldTests(unittest.TestCase):
         self.git(p,'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-m','fixture')
         head=self.git(p,'rev-parse','HEAD')
         overrides=p/'.opencode/opencode.json';overrides.parent.mkdir()
-        custom=b'{"agents":{"SCV":{"model":"lmstudio/project-specific"}}}\n';overrides.write_bytes(custom)
+        custom=b'{"agents":{"Butters":{"model":"lmstudio/project-specific"}}}\n';overrides.write_bytes(custom)
         self.assertEqual(self.run_tool('--here',cwd=p).returncode,0)
         (p/'source.txt').write_bytes(source+b'uncommitted work\n')
         ignore=p/'.gitignore';ignore.write_bytes(b'# Custom ignores\r\n.cache/\r\n!/.opencode/evidence/\r\n')
@@ -540,13 +610,13 @@ class ScaffoldTests(unittest.TestCase):
     def test_update_refuses_worker_orchestration_permission_bypass(self):
         self.assertEqual(self.run_tool('guard','--root',str(self.root)).returncode,0)
         p=self.root/'guard';path=p/'.opencode/opencode.json'
-        for role,action,resource in [('SCV','edit','*'),('probe','edit','opencode.jsonc'),
-                                     ('Overlord','edit','.opencode/WORKFLOW.md'),
-                                     ('SCV','edit','.opencode/preflight.py'),
-                                     ('SCV','edit','.opencode/run-local.py'),
-                                     ('SCV','edit','.opencode/agents/SCV.md'),
-                                     ('probe','edit','.opencode/plugins/step-limit-compat/index.js'),
-                                     ('SCV','external_directory','*')]:
+        for role,action,resource in [('Butters','edit','*'),('Butters','edit','opencode.jsonc'),
+                                     ('Kyle','edit','.opencode/WORKFLOW.md'),
+                                     ('Butters','edit','.opencode/preflight.py'),
+                                     ('Butters','edit','.opencode/run-local.py'),
+                                     ('Butters','edit','.opencode/agents/Butters.md'),
+                                     ('Butters','edit','.opencode/plugins/step-limit-compat/index.js'),
+                                     ('Butters','external_directory','*')]:
             path.write_text(json.dumps({'agents':{role:{'permissions':[
                 {'action':action,'resource':resource,'effect':'allow'}]}}}))
             before=path.read_bytes()
@@ -607,14 +677,14 @@ class ScaffoldTests(unittest.TestCase):
              'PREFLIGHT_TEST_MARKER':str(marker)}
         launcher=['python3.12',str(p/'.opencode/run-local.py'),'--task',str(task)]
         overrides=p/'.opencode/opencode.json'
-        cases=[{'agents':{'Sentry':{'disabled':True}}},
-               {'agents':{'Sentry':{'model':'lmstudio/wrong'}}},
-               {'agents':{'Sentry':{'permissions':[{'action':'shell','resource':'*','effect':'allow'}]}}},
-               {'agents':{'Arbiter':{'permissions':[{'action':'subagent','resource':'Sentry','effect':'deny'}]}}}]
+        cases=[{'agents':{'Stan':{'disabled':True}}},
+               {'agents':{'Stan':{'model':'lmstudio/wrong'}}},
+               {'agents':{'Stan':{'permissions':[{'action':'shell','resource':'*','effect':'allow'}]}}},
+               {'agents':{'Cartman':{'permissions':[{'action':'subagent','resource':'Stan','effect':'deny'}]}}}]
         for local in [False,True]:
             if local:
                 (p/'.opencode/local.json').write_text(json.dumps({'local_provider_ids':['lmstudio'],
-                    'models':{r:'lmstudio/test' for r in ['SCV','probe','Overlord']}}))
+                    'models':{r:'lmstudio/test' for r in ['Butters','Kyle']}}))
             for custom in cases:
                 overrides.write_text(json.dumps(custom));before=overrides.read_bytes()
                 for flags in [[],['--doctor'],['--execute','--routing-reviewed']]:
@@ -701,7 +771,7 @@ class ScaffoldTests(unittest.TestCase):
         files={'AGENTS.md': b'# Existing rules\nNo network. Use custom tests.\n',
                'README.md': b'Existing documentation\n',
                '.opencode/PROJECT.md': b'Additional project rules\n',
-               '.opencode/opencode.json': b'{"agents":{"SCV":{"model":"lmstudio/project-worker"}}}\n'}
+               '.opencode/opencode.json': b'{"agents":{"Butters":{"model":"lmstudio/project-worker"}}}\n'}
         for f,data in files.items():
             out=p/f;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(data)
         r=self.run_tool('--here',cwd=p);self.assertEqual(r.returncode,0,r.stderr)
@@ -715,17 +785,17 @@ class ScaffoldTests(unittest.TestCase):
     def test_incompatible_overrides_fail_before_writes(self):
         self.assertEqual(self.run_tool('conflict','--root',str(self.root)).returncode,0)
         p=self.root/'conflict';config=p/'.opencode/opencode.json'
-        cases=[{'agents': {'Arbiter': {'permissions': [{'action':'subagent','resource':'Sentry','effect':'deny'}]}}},
-               {'agents': {'Sentry': {'model':'lmstudio/wrong-route'}}},
-               {'agents': {'Sentry': {'permissions':[{'action':'edit','resource':'Sources/*','effect':'allow'}]}}},
-               {'agents': {'SCV': {'permissions':[{'action':'subagent','resource':'*','effect':'allow'}]}}},
-               {'agents': {'Overlord': {'disabled':True}}},
-               {'agents': {'Sentry': {'disabled':True}}}]
+        cases=[{'agents': {'Cartman': {'permissions': [{'action':'subagent','resource':'Stan','effect':'deny'}]}}},
+               {'agents': {'Stan': {'model':'lmstudio/wrong-route'}}},
+               {'agents': {'Stan': {'permissions':[{'action':'edit','resource':'Sources/*','effect':'allow'}]}}},
+               {'agents': {'Butters': {'permissions':[{'action':'subagent','resource':'*','effect':'allow'}]}}},
+               {'agents': {'Kyle': {'disabled':True}}},
+               {'agents': {'Stan': {'disabled':True}}}]
         cases.append({'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]})
         cases.extend([{'agents':{'build':{'disabled':True}}},
                       {'agents':{'build':{'model':'lmstudio/wrong'}}},
                       {'agents':{'build':{'system':'Implement everything yourself'}}},
-                      {'agents':{'Arbiter':{'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]}}}])
+                      {'agents':{'Cartman':{'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]}}}])
         for overrides in cases:
             with self.subTest(overrides=overrides):
                 config.write_text(json.dumps(overrides))
@@ -742,12 +812,12 @@ class ScaffoldTests(unittest.TestCase):
         script=source/'newoc.py';p=self.root/'future-agent'
         r=subprocess.run(['python3.12',str(script),'future-agent','--root',str(self.root)],capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
-        overrides=b'{"agents":{"SCV":{"model":"lmstudio/custom"},"Arbiter":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]},"build":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]}},"instructions":["POLICY.md"],"plugins":["./plugins/project-hook"]}\n'
+        overrides=b'{"agents":{"Butters":{"model":"lmstudio/custom"},"Cartman":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]},"build":{"permissions":[{"action":"shell","resource":"git push*","effect":"deny"}]}},"instructions":["POLICY.md"],"plugins":["./plugins/project-hook"]}\n'
         (p/'.opencode/opencode.json').write_bytes(overrides)
         (p/'AGENTS.md').write_text('Project-only instructions.\n')
         config=source/'files/opencode.json';defaults=json.loads(config.read_text())
         defaults['agents']['Auditor']={'model':'lmstudio/qa'}
-        for entry in ['Arbiter','build']:
+        for entry in ['Cartman','build']:
             defaults['agents'][entry]['permissions'].append({'action':'subagent','resource':'Auditor','effect':'allow'})
         config.write_text(json.dumps(defaults,indent=2)+'\n')
         (source/'files/.opencode/agents/Auditor.md').write_text('---\ndescription: Future role\nmode: subagent\n---\nIndependent fixture.\n')
@@ -825,10 +895,10 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
                 query='?'+urlencode({'location[directory]':str(p)})
                 for _ in range(100):
                     agents={a['id']:a for a in api('/api/agent'+query)['data']}
-                    if 'Arbiter' in agents:break
+                    if 'Cartman' in agents:break
                     time.sleep(.1)
-                self.assertIn('Arbiter',agents,sorted(agents))
-                for role in ['Arbiter','build','SCV','probe','Overlord','Sentry']:
+                self.assertIn('Cartman',agents,sorted(agents))
+                for role in ['Cartman','build','Butters','Kyle','Stan']:
                     session=api('/api/session',{'agent':role,'location':{'directory':str(p)}})['data']
                     self.assertEqual(Path(session['location']['directory']).resolve(),p)
                     def permission(action,resource):
@@ -836,14 +906,14 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
                             'action':action,'resources':[resource],'agent':role})['data']['effect']
                     with self.subTest(role=role):
                         self.assertEqual(agents[role]['model']['providerID'],
-                                         'openai' if role in ['Arbiter','build','Sentry'] else 'lmstudio')
-                        expected='ask' if role in ['Arbiter','build'] else 'deny'
+                                         'openai' if role in ['Cartman','build','Stan'] else 'lmstudio')
+                        expected='ask' if role in ['Cartman','build'] else 'deny'
                         self.assertEqual(permission('external_directory',str(self.root/'other-checkout')+'/*'),expected)
                         # Check both tool-relative and absolute resources through the native engine.
-                        if role in ['SCV','probe','Overlord']:
+                        if role in ['Butters','Kyle']:
                             for path in ['opencode.json','opencode.jsonc','.opencode/opencode.json',
-                                         '.opencode/WORKFLOW.md','.opencode/agents/Arbiter.md',
-                                         '.opencode/agents/SCV.md','.opencode/preflight.py',
+                                         '.opencode/WORKFLOW.md','.opencode/agents/Cartman.md',
+                                         '.opencode/agents/Butters.md','.opencode/preflight.py',
                                          '.opencode/plugins/step-limit-compat/index.js']:
                                 for resource in [path,str(p/path)]:
                                     self.assertEqual(permission('edit',resource),'deny',resource)
@@ -865,10 +935,10 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
                 legacy_query='?'+urlencode({'location[directory]':str(legacy)})
                 for _ in range(100):
                     migrated={a['id']:a for a in api('/api/agent'+legacy_query)['data']}
-                    if 'Arbiter' in migrated:break
+                    if 'Cartman' in migrated:break
                     time.sleep(.1)
                 self.assertEqual(migrated['summary']['model'],{'providerID':'openai','id':'project-helper'})
-                for role in ['Arbiter','build']:
+                for role in ['Cartman','build']:
                     session=api('/api/session',{'agent':role,'location':{'directory':str(legacy)}})['data']
                     self.assertEqual(Path(session['location']['directory']).resolve(),legacy)
                     for command,wanted in [('git status --short','allow'),('touch unrelated','deny')]:
@@ -886,36 +956,36 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
         p=self.root/'native'
         plugin=p/'.opencode/plugins/project-hook';plugin.mkdir()
         (plugin/'index.js').write_text("export default {id:'test.project-hook',async setup(){}};\n")
-        overrides={'agents': {'SCV': {'model':'lmstudio/project-worker','steps':7},
+        overrides={'agents': {'Butters': {'model':'lmstudio/project-worker','steps':7},
                               'compaction': {'model':'openai/project-helper'},
-                              'Arbiter': {'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]}},
+                              'Cartman': {'permissions':[{'action':'shell','resource':'git push*','effect':'deny'}]}},
                    'instructions':['POLICY.md'],'plugins':['./plugins/project-hook']}
-        overrides['agents']['build']={'permissions':overrides['agents']['Arbiter']['permissions']}
+        overrides['agents']['build']={'permissions':overrides['agents']['Cartman']['permissions']}
         (p/'.opencode/opencode.json').write_text(json.dumps(overrides))
         env={**os.environ,**{f'XDG_{k}_HOME':str(self.root/k.lower()) for k in ['CONFIG','DATA','CACHE','STATE']}}
         for key in ['OPENCODE_CONFIG','OPENCODE_CONFIG_DIR','OPENCODE_CONFIG_CONTENT']:env.pop(key,None)
         r=subprocess.run(['opencode','debug','agents','--standalone'],cwd=p,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
         agents={a['id']:a for a in json.loads(r.stdout)}
-        self.assertEqual(agents['SCV']['model'],{'providerID':'lmstudio','id':'project-worker'})
-        self.assertEqual(agents['SCV']['steps'],7)
-        for role in ['SCV','probe']:
+        self.assertEqual(agents['Butters']['model'],{'providerID':'lmstudio','id':'project-worker'})
+        self.assertEqual(agents['Butters']['steps'],7)
+        for role in ['Butters']:
             for resource in ['opencode.json','*/opencode.json']:
                 rules=[r for r in agents[role]['permissions'] if r['action']=='edit' and r['resource']==resource]
                 self.assertEqual(rules[-1]['effect'],'deny')
-        self.assertEqual(agents['Sentry']['model'],{'providerID':'openai','id':'gpt-6.1-sol'})
-        for coordinator in ['Arbiter','build']:
+        self.assertEqual(agents['Stan']['model'],{'providerID':'openai','id':'gpt-6.1-sol'})
+        for coordinator in ['Cartman','build']:
             push=[r for r in agents[coordinator]['permissions'] if r['action']=='shell' and r['resource']=='git push*']
             self.assertEqual(push[-1]['effect'],'deny')
-        self.assertEqual(agents['build']['model'],agents['Arbiter']['model'])
-        self.assertEqual(agents['build']['steps'],agents['Arbiter']['steps'])
-        self.assertIn(agents['Arbiter']['system'].strip(),agents['build']['system'])
-        for coordinator in ['Arbiter','build']:
+        self.assertEqual(agents['build']['model'],agents['Cartman']['model'])
+        self.assertEqual(agents['build']['steps'],agents['Cartman']['steps'])
+        self.assertIn(agents['Cartman']['system'].strip(),agents['build']['system'])
+        for coordinator in ['Cartman','build']:
             rules=[r for r in agents[coordinator]['permissions'] if r['action']=='subagent']
-            self.assertEqual(rules[-5:],[{'action':'subagent','resource':'*','effect':'deny'},
-                *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['SCV','Overlord','probe','Sentry']]])
+            self.assertEqual(rules[-4:],[{'action':'subagent','resource':'*','effect':'deny'},
+                *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['Butters','Kyle','Stan']]])
         for action in ['edit','shell','execute','subagent','external_directory']:
-            rules=[r for r in agents['Sentry']['permissions'] if r['action']==action and r['resource']=='*']
+            rules=[r for r in agents['Stan']['permissions'] if r['action']==action and r['resource']=='*']
             self.assertEqual(rules[-1]['effect'],'deny')
         r=subprocess.run(['opencode','debug','config','--standalone'],cwd=p,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
@@ -1025,7 +1095,7 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
         self.assertEqual(self.run_tool('system-policy','--root',str(self.root)).returncode,0)
         p=self.root/'system-policy';overrides=p/'.opencode/opencode.json'
         before={str(f.relative_to(p)):f.read_bytes() for f in p.rglob('*') if f.is_file() and '.git' not in f.parts}
-        for role in ['Arbiter','build']:
+        for role in ['Cartman','build']:
             rules={'agents':{role:{'system':'Project constraint: never send internal source to cloud review.'}}}
             overrides.write_text(json.dumps(rules));original=overrides.read_bytes()
             r=self.run_tool('--update','--apply',cwd=p)
