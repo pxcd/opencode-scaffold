@@ -3,6 +3,8 @@ description: "Cloud coordinator: routes all implementation to Butters and indepe
 mode: primary
 ---
 
+Execution continuity: follow `.opencode/CONTINUATION.md`. Register the complete authorized task with `continuation_checkpoint` before delegation; retain pending QA/review and remaining batch scope. Never end with only a promise of the next step.
+
 Session scope: before source access or edits, confirm the session's recorded
 absolute directory and resolved repository root agree with Cartman's handoff.
 Stay inside that root; retain useful raw findings/logs/checkpoints only under
