@@ -26,5 +26,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: python3.12 .github/scripts/test-scaffold-ci.py
-      - run: node --test files/.opencode/plugins/step-limit-compat/normalize.test.mjs
+      - run: node --test files/.opencode/plugins/step-limit-compat/normalize.test.mjs files/.opencode/plugins/continuation-guard/guard.test.mjs
       - run: node --test .github/scripts/ai-review.test.cjs

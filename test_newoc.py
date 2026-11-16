@@ -27,6 +27,16 @@ class ScaffoldTests(unittest.TestCase):
         self.root = Path(self.temp.name)
     def tearDown(self):
         self.temp.cleanup()
+    def test_continuation_guard_is_managed_and_loaded(self):
+        self.assertEqual(self.run_tool('guarded', '--root', str(self.root)).returncode, 0)
+        project = self.root / 'guarded'
+        config = json.loads((project / 'opencode.json').read_text())
+        manifest = json.loads((project / '.opencode/scaffold.json').read_text())
+        self.assertIn('./.opencode/plugins/continuation-guard', config['plugins'])
+        self.assertIn('.opencode/CONTINUATION.md', config['instructions'])
+        for name in ['.opencode/CONTINUATION.md', '.opencode/plugins/continuation-guard/index.js']:
+            self.assertEqual(manifest['files'][name], hashlib.sha256((project / name).read_bytes()).hexdigest())
+
     def run_tool(self, *args, cwd=None):
         return subprocess.run(['python3.12',str(SCRIPT),*args],cwd=cwd,text=True,capture_output=True)
     def git(self, path, *args):

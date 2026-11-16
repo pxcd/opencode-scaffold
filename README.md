@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.1
+# Native Sol Cartman + local OpenCode scaffold 4.3.2
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -29,9 +29,11 @@ read-only code review). Desktop `build` loads Cartman's policy. The separate pro
 builder is retired. Butters and Kyle retain their Swift local routes; Cartman and
 Stan retain Sol. Maintenance helpers retain their existing purpose and routes.
 
-Managed HANDOFFS.md supplies one brief character-style line at real assignments,
-acknowledgements, checkpoints and verdicts. It never replaces factual receipts,
-invented dialogue is forbidden, and no model calls are added to stage the characters.
+Managed HANDOFFS.md supplies brief in-character banter at real assignments,
+acknowledgements, checkpoints and verdicts, especially Cartman theatrically blaming
+Butters. Each agent speaks only for itself; jokes do not establish defect authorship.
+Precise assignments, findings, tests and approvals remain factual and separate from
+the banter. Invented dialogue is forbidden, and no model calls are added to stage it.
 Plain/professional user instructions override the style. No live inference is
 required for configuration/update tests; actual delivery of the voice remains
 model behavior to observe in an authorized real session.
@@ -353,6 +355,33 @@ commit or publish. Deliberately pull/check out a reviewed source release first.
 Rollback the installed starter by deploying a reviewed previous source/backup;
 existing projects remain unchanged. Roll back project changes through their own
 reviewed history. There is no automatic fleet sync or bulk migration.
+
+## Native continuation guard
+
+New scaffold deployments load the managed continuation guard and
+`.opencode/CONTINUATION.md`. Before delegation, the coordinator registers the full
+authorized task and its milestones using `continuation_checkpoint`. Pending QA,
+review and remaining batch groups prevent a normal final response from silently
+ending the task. The native idle hook feeds the next action to the same coordinator;
+it adds neither a polling service nor another cloud arbiter.
+
+The guard waits for parent-owned jobs and preserves user pauses, interruptions,
+permissions and scope. Recovery stops after three unchanged milestone checkpoints,
+twelve automatic nudges, or a 24-hour activation window. A bounded stop is reported
+as incomplete/blocked, never acceptance. Progress evidence remains a coordinator
+claim; this is not an independent QA verifier or an OS-enforced execution budget.
+
+Interruption monitoring and idle continuation were exercised with OpenCode 2.3.0
+using a loopback fake model. The hook is experimental; revalidate native compatibility
+on upgrades. These commands use isolated fixtures and no real model inference:
+
+```sh
+node --test files/.opencode/plugins/continuation-guard/guard.test.mjs
+NEWOC_NATIVE_TESTS=1 python3.12 -B -m unittest -v test_continuation_native.py
+```
+
+Existing deployed projects are unchanged until a separately authorized update.
+Never patch deployed scaffold files to enable the guard.
 
 ## Compatibility and limits
 

@@ -4,7 +4,8 @@
     ".opencode/BASELINE.md",
     ".opencode/WORKFLOW.md",
     ".opencode/PROJECT.md",
-    ".opencode/HANDOFFS.md"
+    ".opencode/HANDOFFS.md",
+    ".opencode/CONTINUATION.md"
   ],
   "experimental": {
     "subagent_depth": 1
@@ -59,7 +60,8 @@
     }
   ],
   "plugins": [
-    "./.opencode/plugins/step-limit-compat"
+    "./.opencode/plugins/step-limit-compat",
+    "./.opencode/plugins/continuation-guard"
   ],
   "agents": {
     "Butters": {
