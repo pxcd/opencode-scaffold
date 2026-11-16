@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.1
+# Native Sol Cartman + local OpenCode scaffold 4.3.2
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -29,9 +29,11 @@ read-only code review). Desktop `build` loads Cartman's policy. The separate pro
 builder is retired. Butters and Kyle retain their Swift local routes; Cartman and
 Stan retain Sol. Maintenance helpers retain their existing purpose and routes.
 
-Managed HANDOFFS.md supplies one brief character-style line at real assignments,
-acknowledgements, checkpoints and verdicts. It never replaces factual receipts,
-invented dialogue is forbidden, and no model calls are added to stage the characters.
+Managed HANDOFFS.md supplies brief in-character banter at real assignments,
+acknowledgements, checkpoints and verdicts, especially Cartman theatrically blaming
+Butters. Each agent speaks only for itself; jokes do not establish defect authorship.
+Precise assignments, findings, tests and approvals remain factual and separate from
+the banter. Invented dialogue is forbidden, and no model calls are added to stage it.
 Plain/professional user instructions override the style. No live inference is
 required for configuration/update tests; actual delivery of the voice remains
 model behavior to observe in an authorized real session.

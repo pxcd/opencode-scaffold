@@ -20,7 +20,8 @@ Cartman, SCV means Butters, Overlord means Kyle, and Sentry means Stan. Treat th
 as historical labels, not native IDs to dispatch. The former probe UI builder is
 retired: Butters implements both behavior and presentation. Preserve substantive
 project constraints while using the current native role IDs. Read HANDOFFS.md for
-brief character-style handoff lines; never fabricate another agent's response.
+brief in-character banter, including comic blame, followed by factual handoffs
+and evidence; never fabricate another agent's response or technical responsibility.
 
 The coordinator has two supported primary entry IDs: `build`, used by the normal
 Desktop composer, and `Cartman`, used by explicit CLI/API selection. Both load the
