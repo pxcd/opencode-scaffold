@@ -34,6 +34,11 @@ export async function install(ctx, now = Date.now) {
   const root = await realpath(ctx.location.directory);
   const locks = new Map();
   const registrations = [];
+  const epochs = new Map();
+  const suspended = new Set();
+  const epoch = id => epochs.get(id) ?? 0;
+  const suspend = id => { epochs.set(id, epoch(id) + 1); suspended.add(id); return epoch(id); };
+  const clear = (id, version) => { if (epoch(id) === version) suspended.delete(id); };
   const abort = new AbortController();
   let monitoring = true;
   const serial = (id, work) => {
@@ -56,15 +61,22 @@ export async function install(ctx, now = Date.now) {
     return !session.parentID && PRIMARY.has(session.agent)
       && await realpath(session.location.directory) === root;
   };
-  const notice = (id, message) => ctx.session.synthetic({ sessionID: id, text: message,
-    description: 'Scaffold continuation guard', metadata: { source: 'scaffold.continuation-guard' }, resume: true });
+  const notice = (id, message, version) => {
+    if (abort.signal.aborted || suspended.has(id) || epoch(id) !== version) return;
+    // Idle-hook input is consumed by the CURRENT execution. Never independently
+    // restart a session if interruption races the asynchronous admission call.
+    return ctx.session.synthetic({ sessionID: id, text: message,
+      description: 'Scaffold continuation guard', metadata: { source: 'scaffold.continuation-guard' }, resume: false });
+  };
 
   async function checkpoint(input, context) {
     const id = context.sessionID;
+    const version = epoch(id);
     if (!PRIMARY.has(context.agent) || !await primary(id))
       throw new Error('Continuation checkpoints belong to the primary coordinator in this checkout');
     return serial(id, async () => {
       const old = await get(id);
+      if (epoch(id) !== version) throw new Error('New input or interruption superseded this checkpoint action');
       const state = old && structuredClone(old);
       if (input.action === 'status') return { content: JSON.stringify(state ?? { phase: 'unarmed' }) };
       if (input.action === 'start') {
@@ -79,7 +91,7 @@ export async function install(ctx, now = Date.now) {
         const nextAction = text(input.next_action, 'next_action');
         const fresh = { version: 1, root, goal, milestones, nextAction, phase: 'active',
           revision: 0, lastRevision: -1, resumes: 0, stalls: 0, started: now(), freshInput: false };
-        await put(id, fresh); return { content: JSON.stringify(fresh) };
+        await put(id, fresh); clear(id, version); return { content: JSON.stringify(fresh) };
       }
       if (!state) throw new Error('Register the task first');
       if (state.root !== root && input.action !== 'rebind')
@@ -121,7 +133,9 @@ export async function install(ctx, now = Date.now) {
           state.nextAction = text(input.next_action, 'next_action');
         } else throw new Error('Unknown checkpoint action');
       }
-      await put(id, state); return { content: JSON.stringify(state) };
+      await put(id, state);
+      if (input.action === 'resume' || input.action === 'rebind') clear(id, version);
+      return { content: JSON.stringify(state) };
     });
   }
 
@@ -132,24 +146,28 @@ export async function install(ctx, now = Date.now) {
   })));
   registrations.push(await ctx.tool.hook('execute.before', async event => {
     if (event.tool !== 'subagent' || !PRIMARY.has(event.agent)) return;
+    const version = epoch(event.sessionID);
     if (!await primary(event.sessionID)) return;
     await serial(event.sessionID, async () => {
       const state = await get(event.sessionID);
-      if (!state || state.phase !== 'active' || state.root !== root)
+      if (suspended.has(event.sessionID) || epoch(event.sessionID) !== version
+          || !state || state.phase !== 'active' || state.root !== root)
         throw new Error('Use continuation_checkpoint to register/resume the authorized plan before delegation');
     });
   }));
   registrations.push(await ctx.session.hook('prompt', async event => {
-    if (!await primary(event.sessionID)) return;
+    const version = suspend(event.sessionID); // Fence BEFORE awaiting the session lock.
+    if (!await primary(event.sessionID)) { clear(event.sessionID, version); return; }
     await serial(event.sessionID, async () => {
       const state = await get(event.sessionID);
-      if (!state || state.phase === 'complete') return;
+      if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
       state.phase = 'paused'; state.freshInput = true;
       state.reason = 'New user input: reconcile the latest instruction before resuming';
       await put(event.sessionID, state);
     });
   }));
   registrations.push(await ctx.session.hook('experimental.idle', async event => {
+    const version = epoch(event.sessionID);
     if (!await primary(event.sessionID)) return;
     await serial(event.sessionID, async () => {
       const state = await get(event.sessionID);
@@ -168,13 +186,13 @@ export async function install(ctx, now = Date.now) {
       if (reason) {
         state.phase = 'blocked'; state.reason = reason; state.freshInput = false;
         await put(event.sessionID, state);
-        await notice(event.sessionID, `Continuation guard stopped automatic recovery: ${reason}. Preserve the checkpoint and report the concrete limitation. Do not restart, broaden permissions, or claim completion. Fresh user input is required.`);
+        await notice(event.sessionID, `Continuation guard stopped automatic recovery: ${reason}. Preserve the checkpoint and report the concrete limitation. Do not restart, broaden permissions, or claim completion. Fresh user input is required.`, version);
         return;
       }
       state.resumes++; state.lastRevision = state.revision;
       await put(event.sessionID, state); // Persist before enqueueing; duplicates consume the bounded budget.
       const remaining = state.milestones.filter(m => !m.done).map(m => `${m.id}: ${m.title}`).join('; ');
-      await notice(event.sessionID, `The authorized task is still active. Pending milestones: ${remaining || 'record final evidence and complete the checkpoint'}. Next action: ${state.nextAction}. Execute the next permitted action now; describing readiness does not finish it. Respect current scope, permissions, budgets, and user stop instructions. If genuinely blocked, record a concrete blocker using continuation_checkpoint. This notice grants no new authority.`);
+      await notice(event.sessionID, `The authorized task is still active. Pending milestones: ${remaining || 'record final evidence and complete the checkpoint'}. Next action: ${state.nextAction}. Execute the next permitted action now; describing readiness does not finish it. Respect current scope, permissions, budgets, and user stop instructions. If genuinely blocked, record a concrete blocker using continuation_checkpoint. This notice grants no new authority.`, version);
     });
   }));
 
@@ -183,9 +201,10 @@ export async function install(ctx, now = Date.now) {
       for await (const event of ctx.event.subscribe({ types: ['session.execution.interrupted', 'session.execution.failed'], signal: abort.signal })) {
         const id = event.data?.sessionID;
         if (!id) continue;
+        const version = suspend(id); // Do not queue cancellation behind the idle hook.
         await serial(id, async () => {
           const state = await get(id);
-          if (!state || state.phase !== 'active') return;
+          if (!state || state.phase !== 'active') { if (!state || state.phase === 'complete') clear(id, version); return; }
           state.phase = 'paused'; state.freshInput = false;
           state.reason = 'Native execution interrupted or failed; no automatic restart';
           await put(id, state);

@@ -12,7 +12,10 @@ a batch completion; dispatch the next permitted step instead of merely saying it
 is ready. Complete only when every registered milestone has current evidence.
 Evidence strings are coordinator claims, not machine verification of QA quality.
 
-The native `experimental.idle` hook feeds unfinished work back to the SAME primary
+The native `experimental.idle` hook queues unfinished work with `resume: false`
+for the CURRENT execution, rather than starting another execution. Cancellation
+and new-input epochs fence pending admissions before the session lock.
+It feeds unfinished work back to the SAME primary
 coordinator. It does not poll, add a cloud arbiter, execute shell commands, broaden
 permissions, or repeat a consequential action on its own. Parent-owned background
 jobs wake the parent normally; abandoned descendant work is reported as blocked.

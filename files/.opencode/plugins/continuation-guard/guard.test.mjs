@@ -6,12 +6,16 @@ import { install } from './index.js';
 const root = fileURLToPath(new URL('.', import.meta.url)).replace(/\/$/, '');
 async function fixture(t, existing = new Map(), directory = root) {
   const hooks = new Map(), tools = new Map(), notices = [];
+  let heldWrite;
   let clock = 1000, session = { agent: 'Cartman', location: { directory } };
   const queue = []; let wake, ended = false;
   const context = {
     location: { directory },
     storage: { get: async k => existing.has(k) ? structuredClone(existing.get(k)) : undefined,
-      set: async (k, v) => existing.set(k, structuredClone(v)) },
+      set: async (k, v) => {
+        if (heldWrite) { const held = heldWrite; heldWrite = undefined; held.enter(); await held.wait; }
+        existing.set(k, structuredClone(v));
+      } },
     session: { get: async () => session,
       synthetic: async n => { notices.push(n); },
       hook: async (name, callback) => { hooks.set(name, callback); return { dispose: async () => hooks.delete(name) }; } },
@@ -30,6 +34,11 @@ async function fixture(t, existing = new Map(), directory = root) {
   const call = (input, agent = 'Cartman') => tools.get('continuation_checkpoint').execute(input, { sessionID: 's1', agent });
   return { call, notices, existing, context,
     state: () => existing.get('continuation:s1'),
+    holdNextWrite: () => {
+      let enter, release; const entered = new Promise(r => { enter = r; });
+      const wait = new Promise(r => { release = r; }); heldWrite = { enter, wait };
+      return { entered, release };
+    },
     start: () => call({ action: 'start', goal: 'Finish authorized change',
       milestones: [{ id: 'repair', title: 'Repair' }, { id: 'qa', title: 'Fresh QA' }], next_action: 'Repair, then execute fresh QA' }),
     idle: background => hooks.get('experimental.idle')({ sessionID: 's1', background: background ?? [] }),
@@ -49,7 +58,7 @@ test('repair ready for QA cannot quietly finish: injects continuation in same se
   await f.call({ action: 'progress', completed: ['repair'], evidence: 'Focused test exit0', next_action: 'Dispatch fresh QA' });
   await assert.rejects(f.call({ action: 'complete', evidence: 'Ready for QA' }), /Pending/);
   await f.idle(); assert.equal(f.notices.length, 1); assert.equal(f.notices[0].sessionID, 's1');
-  assert.equal(f.notices[0].resume, true); assert.match(f.notices[0].text, /qa: Fresh QA/);
+  assert.equal(f.notices[0].resume, false); assert.match(f.notices[0].text, /qa: Fresh QA/);
 });
 test('native background worker wakes parent; do not dispatch or spend recovery budget', async t => {
   const f = await fixture(t); await f.start();
@@ -157,4 +166,31 @@ test('authorized native checkout move can retain the full plan without resetting
   assert.equal(second.state().milestones.length, 2); assert.equal(second.state().resumes, 1);
   await second.delegate(); await second.idle(); assert.equal(second.notices.length, 1);
   await first.idle(); assert.equal(first.notices.length, 1); // Old-root hook cannot resume it.
+});
+
+for (const type of ['session.execution.interrupted', 'session.execution.failed'])
+  test(type + ' during idle storage write cannot enqueue stale continuation', async t => {
+    const f = await fixture(t); await f.start(); const held = f.holdNextWrite();
+    const pending = f.idle(); await held.entered;
+    await f.event(type); held.release(); await pending;
+    await new Promise(r => setImmediate(r));
+    assert.equal(f.notices.length, 0); assert.equal(f.state().phase, 'paused');
+  });
+test('new user input during idle storage write fences the stale task', async t => {
+  const f = await fixture(t); await f.start(); const held = f.holdNextWrite();
+  const pending = f.idle(); await held.entered;
+  const input = f.prompt(); await new Promise(r => setImmediate(r));
+  held.release(); await pending; await input;
+  assert.equal(f.notices.length, 0); assert.equal(f.state().phase, 'paused');
+});
+
+test('interruption during asynchronous admission cannot request a new execution', async t => {
+  const f = await fixture(t); await f.start();
+  f.context.session.synthetic = async notice => {
+    await f.event('session.execution.interrupted'); f.notices.push(notice);
+  };
+  await f.idle(); await new Promise(r => setImmediate(r));
+  assert.equal(f.notices.length, 1);
+  assert.equal(f.notices[0].resume, false); // The server may queue it, never restart after stop.
+  assert.equal(f.state().phase, 'paused');
 });
