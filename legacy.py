@@ -4,7 +4,7 @@ from fnmatch import fnmatchcase
 import hashlib
 import json
 from pathlib import Path
-from roles import RENAMES, RETIRED, rename_overrides
+from roles import RENAMES, RETIRED, drop_previous_cloud_defaults, rename_overrides
 
 
 def plan(target, contents, catalog, defaults, check_path, ownership=None):
@@ -61,6 +61,7 @@ def plan(target, contents, catalog, defaults, check_path, ownership=None):
                             'primary' if key == 'mode' and role == 'Arbiter' else
                             'subagent' if key == 'mode' else None)}
         messages.append(f'{role}: recognized {record["snapshot"]}; retain model/step overrides')
+    drop_previous_cloud_defaults(custom)
     custom = rename_overrides(custom, target)
     agents = custom.setdefault('agents', {})
     for role in list(agents):
