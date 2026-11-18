@@ -197,7 +197,7 @@
       ]
     },
     "Cartman": {
-      "model": "openai/gpt-6.1-sol",
+      "model": "openai/gpt-6.2-sol#medium",
       "steps": 80,
       "permissions": [
         {
@@ -333,7 +333,7 @@
       ]
     },
     "Stan": {
-      "model": "openai/gpt-6.1-sol",
+      "model": "openai/gpt-6.2-sol#medium",
       "steps": 40,
       "permissions": [
         {
@@ -364,7 +364,7 @@
       ]
     },
     "build": {
-      "model": "openai/gpt-6.1-sol",
+      "model": "openai/gpt-6.2-sol#medium",
       "steps": 80,
       "permissions": [
         {
@@ -503,7 +503,7 @@
       "system": "{file:.opencode/agents/Cartman.md}"
     }
   },
-  "model": "openai/gpt-6.1-sol",
+  "model": "openai/gpt-6.2-sol#medium",
   "enabled_providers": [
     "openai",
     "lmstudio"

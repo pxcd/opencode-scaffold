@@ -7,6 +7,19 @@ RENAMES = {'Arbiter': 'Cartman', 'SCV': 'Butters', 'Overlord': 'Kyle', 'Sentry':
 RETIRED = 'probe'
 
 
+def drop_previous_cloud_defaults(config):
+    """Let managed routes advance past the former pinned Sol default."""
+    previous = 'openai/gpt-6.1-sol'
+    if config.get('model') == previous:
+        del config['model']
+    agents = config.get('agents', {})
+    if isinstance(agents, dict):
+        for role in ('Arbiter', 'Cartman', 'build', 'Sentry', 'Stan'):
+            settings = agents.get(role)
+            if isinstance(settings, dict) and settings.get('model') == previous:
+                del settings['model']
+
+
 def rename_overrides(value, target=None):
     result = deepcopy(value)
     if not isinstance(result, dict):

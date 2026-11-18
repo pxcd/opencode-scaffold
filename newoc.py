@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.12
 """Copy reviewed, local OpenCode project policy without overwriting existing files."""
 import argparse
+from copy import deepcopy
 import hashlib
 import json
 import os
@@ -22,7 +23,7 @@ STARTER_HISTORY = TEMPLATE.parent / 'starter-history'
 # The same checker is shipped into projects for dispatch-time validation.
 sys.path.insert(0, str(TEMPLATE / '.opencode'))
 from preflight import validate_overrides
-from roles import RENAMES, RETIRED, rename_overrides
+from roles import RENAMES, RETIRED, drop_previous_cloud_defaults, rename_overrides
 
 
 def managed(relative):
@@ -241,7 +242,11 @@ def update(target, apply=False):
     original_overrides = override_path.read_bytes() if override_path.exists() else None
     parsed_overrides = json.loads(original_overrides) if original_overrides is not None else {}
     retired_paths = {f'.opencode/agents/{role}.md' for role in [*RENAMES, RETIRED]}
-    overrides = rename_overrides(parsed_overrides, target) if retired_paths & set(old['files']) else parsed_overrides
+    overrides = deepcopy(parsed_overrides)
+    if isinstance(overrides, dict) and tuple(map(int, old['version'].split('.'))) < (4, 3, 3):
+        drop_previous_cloud_defaults(overrides)
+    if retired_paths & set(old['files']):
+        overrides = rename_overrides(overrides, target)
     validate_overrides(target, json.loads(contents[Path('opencode.json')]), overrides)
     # No implicit deletion or adoption of existing unmanaged files.
     old_files = {p: h for p, h in old['files'].items() if Path(p).name != '.DS_Store'}

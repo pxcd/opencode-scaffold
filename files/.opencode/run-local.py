@@ -12,7 +12,7 @@ import uuid
 from preflight import validate_overrides
 
 ROLES = ('Butters', 'Kyle')
-ARBITER_MODEL = 'openai/gpt-6.1-sol'
+ARBITER_MODEL = 'openai/gpt-6.2-sol#medium'
 HELPERS = ('compaction', 'title', 'summary')
 
 
@@ -24,7 +24,7 @@ def verified_session(root, env, session_id=None):
     else:
         command += ['session.create', '--data', json.dumps({
             'location': {'directory': str(root)}, 'agent': 'Cartman',
-            'model': {'providerID': 'openai', 'id': 'gpt-6.1-sol'}})]
+            'model': {'providerID': 'openai', 'id': 'gpt-6.2-sol', 'variant': 'medium'}})]
     result = subprocess.run(command, cwd=root, env=env, capture_output=True, text=True)
     if result.returncode:
         raise ValueError('Native session discovery failed; no task submitted')

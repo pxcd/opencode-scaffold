@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.2
+# Native Sol Cartman + local OpenCode scaffold 4.3.3
 
 The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -61,7 +61,7 @@ for the current team. A partial new team fails instead of falling back to old ro
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
-Cartman is primary, pinned to `openai/gpt-6.1-sol`, and can dispatch only Butters, Kyle and Stan. All subagents have delegation denied. Default local
+Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch only Butters, Kyle and Stan. All subagents have delegation denied. Default local
 worker and maintenance-helper model IDs use `lmstudio/swift-1.5-qwen3.8-27b-splash`
 for Butters, Kyle, title, summary and compaction. Cartman, its desktop `build` alias
 and Stan use cloud Sol. Project and ignored launcher overrides still take precedence;
@@ -266,7 +266,7 @@ Example project-owned `.opencode/opencode.json`:
 {
   "agents": {
     "Butters": {"model": "lmstudio/project-worker", "steps": 24},
-    "compaction": {"model": "openai/gpt-6.1-sol"},
+    "compaction": {"model": "openai/gpt-6.2-sol#medium"},
     "Cartman": {
       "permissions": [{"action": "shell", "resource": "git push*", "effect": "deny"}]
     },
@@ -401,7 +401,7 @@ Shared configuration denies Git pushes for workers and helpers. Only the coordin
 ## Stan code review (3.1.0)
 
 Kyle retains independent local source assessment and executed QA. Stan is a
-fresh, read-only `openai/gpt-6.1-sol` subagent for final code review, with shell,
+fresh, read-only `openai/gpt-6.2-sol#medium` subagent for final code review, with shell,
 edits, nested execution and delegation denied. Cartman supplies a bounded diff,
 relevant paths, original acceptance, revision identities and QA evidence. Stan
 returns concrete findings and PASS/FAIL/BLOCKED; it never repairs or publishes.

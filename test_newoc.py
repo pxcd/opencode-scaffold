@@ -284,7 +284,7 @@ class ScaffoldTests(unittest.TestCase):
         config=json.loads((p/'opencode.json').read_text())
         self.assertEqual(config['default_agent'],'Cartman')
         self.assertIn('.opencode/BASELINE.md',config['instructions'])
-        self.assertEqual(config['agents']['Cartman']['model'],'openai/gpt-6.1-sol')
+        self.assertEqual(config['agents']['Cartman']['model'],'openai/gpt-6.2-sol#medium')
         self.assertIn('mode: primary',(p/'.opencode/agents/Cartman.md').read_text())
         for role in ['Butters','Kyle']:
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
@@ -292,12 +292,41 @@ class ScaffoldTests(unittest.TestCase):
             self.assertEqual(config['agents'][role]['model'],
                              'lmstudio/swift-1.5-qwen3.8-27b-splash')
         for role in ['Cartman','Stan','build']:
-            self.assertEqual(config['agents'][role]['model'],'openai/gpt-6.1-sol')
+            self.assertEqual(config['agents'][role]['model'],'openai/gpt-6.2-sol#medium')
         profile=json.loads((p/'.opencode/local.example.json').read_text())
         self.assertTrue(all(model=='lmstudio/swift-1.5-qwen3.8-27b-splash'
                             for model in profile['models'].values()))
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
         self.assertFalse(list(p.rglob('__pycache__')))
+
+    def test_cloud_model_update_retires_old_pins_and_preserves_local_overrides(self):
+        self.assertEqual(self.run_tool('cloud-update', '--root', str(self.root)).returncode, 0)
+        project = self.root / 'cloud-update'
+        metadata = project / '.opencode/scaffold.json'
+        manifest = json.loads(metadata.read_text())
+        config_path = project / 'opencode.json'
+        old_model = 'openai/gpt-6.1-sol'
+        config_path.write_text(config_path.read_text().replace('openai/gpt-6.2-sol#medium', old_model))
+        manifest['version'] = '4.3.2'
+        manifest['files']['opencode.json'] = hashlib.sha256(config_path.read_bytes()).hexdigest()
+        metadata.write_text(json.dumps(manifest))
+        overrides = project / '.opencode/opencode.json'
+        overrides.write_text(json.dumps({'model': old_model, 'agents': {
+            'Cartman': {'model': old_model, 'steps': 51},
+            'build': {'model': old_model},
+            'Stan': {'model': old_model},
+            'Kyle': {'model': 'lmstudio/project-qa'},
+        }}))
+        result = self.run_tool('--update', '--apply', cwd=project)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = json.loads(config_path.read_text())
+        self.assertEqual(config['model'], 'openai/gpt-6.2-sol#medium')
+        custom = json.loads(overrides.read_text())
+        self.assertNotIn('model', custom)
+        for role in ('Cartman', 'build', 'Stan'):
+            self.assertNotIn('model', custom['agents'][role])
+        self.assertEqual(custom['agents']['Cartman']['steps'], 51)
+        self.assertEqual(custom['agents']['Kyle']['model'], 'lmstudio/project-qa')
 
     def test_tracked_role_id_upgrade_preserves_overrides_and_retires_ui_builder(self):
         import shutil
@@ -417,7 +446,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(self.run_tool('review', '--root', str(self.root)).returncode, 0)
         p = self.root/'review'
         config = json.loads((p/'opencode.json').read_text())
-        self.assertEqual(config['agents']['Stan']['model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(config['agents']['Stan']['model'], 'openai/gpt-6.2-sol#medium')
         def header(role):
             text = (p/f'.opencode/agents/{role}.md').read_text().removeprefix('---\n').split('\n---\n', 1)[0]
             return json.loads(subprocess.check_output(
@@ -439,7 +468,7 @@ class ScaffoldTests(unittest.TestCase):
         (p/'task.md').write_text('Review fixture')
         preview = json.loads(subprocess.check_output([
             'python3.12', str(p/'.opencode/run-local.py'), '--task', str(p/'task.md')], text=True))
-        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'], 'openai/gpt-6.1-sol')
+        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'], 'openai/gpt-6.2-sol#medium')
 
     def test_builders_cannot_edit_managed_root_config(self):
         config=json.loads((HERE/'files/opencode.json').read_text())
@@ -594,15 +623,15 @@ class ScaffoldTests(unittest.TestCase):
         (p/'.opencode/opencode.json').write_text(json.dumps({'agents': {'compaction': native['agents']['compaction']}}))
         preview=json.loads(subprocess.check_output(args,text=True))
         self.assertNotIn('compaction',preview['runtime_config']['agents'])
-        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.1-sol')
+        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.2-sol#medium')
         self.assertNotIn('enabled_providers',preview['runtime_config'])
         profile={'local_provider_ids':['lmstudio'],'models':{r:'lmstudio/test-local' for r in ['Butters','Kyle','title']}}
         (p/'.opencode/local.json').write_text(json.dumps(profile))
         r=subprocess.run(args,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
         preview=json.loads(r.stdout)
         self.assertEqual(set(preview['runtime_config']['agents']),{'Cartman','Butters','Kyle','Stan','title','summary','compaction'})
-        self.assertEqual(preview['runtime_config']['agents']['Cartman']['model'],'openai/gpt-6.1-sol')
-        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.1-sol')
+        self.assertEqual(preview['runtime_config']['agents']['Cartman']['model'],'openai/gpt-6.2-sol#medium')
+        self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.2-sol#medium')
         self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n not in ('Cartman','Stan')))
         self.assertIn('Codex intervention is optional',preview['argv'][-1])
         self.assertNotIn('--auto',preview['argv'])
@@ -1044,7 +1073,7 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
             for resource in ['opencode.json','*/opencode.json']:
                 rules=[r for r in agents[role]['permissions'] if r['action']=='edit' and r['resource']==resource]
                 self.assertEqual(rules[-1]['effect'],'deny')
-        self.assertEqual(agents['Stan']['model'],{'providerID':'openai','id':'gpt-6.1-sol'})
+        self.assertEqual(agents['Stan']['model'],{'providerID':'openai','id':'gpt-6.2-sol','variant':'medium'})
         for coordinator in ['Cartman','build']:
             push=[r for r in agents[coordinator]['permissions'] if r['action']=='shell' and r['resource']=='git push*']
             self.assertEqual(push[-1]['effect'],'deny')
