@@ -8,7 +8,7 @@ remain authoritative. Keep handoffs and evidence scoped to the current task.
 
 ## Two levels, one active execution coordinator
 
-GPT-6.1 Sol runs as the native OpenCode Cartman. It owns planning, routing,
+GPT-6.2 Sol Medium runs as the native OpenCode Cartman. It owns planning, routing,
 checkpoints, recovery, integration and independent verification. Butters implements
 behavior and UI; fresh Kyle independently verifies;
 fresh Stan performs final cloud code review. All subagents cannot delegate further.
@@ -36,7 +36,7 @@ or repeated intervention. Do not run two competing coordinator loops or have
 Codex dispatch duplicate workers alongside Cartman. Direct OpenCode use is fully
 supported; the launcher is only an optional handoff/diagnostic entry point.
 
-Cartman and Stan are routed to cloud GPT-6.1 Sol.
+Cartman and Stan are routed to cloud GPT-6.2 Sol Medium.
 Butters and Kyle remain local;
 maintenance helpers remain local unless the project contract explicitly authorizes
 other helper routes. Provider registration, endpoint locality and plugin review

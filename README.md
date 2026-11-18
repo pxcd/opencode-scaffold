@@ -1,6 +1,6 @@
 # Native Sol Cartman + local OpenCode scaffold 4.3.3
 
-The existing `newoc` command creates projects with **GPT-6.1 Sol as the native
+The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
 reviewer, and optional Codex oversight.
 Cartman owns the complete delegation, checkpoint, recovery and independent-QA loop.
@@ -65,7 +65,8 @@ Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch only
 worker and maintenance-helper model IDs use `lmstudio/swift-1.5-qwen3.8-27b-splash`
 for Butters, Kyle, title, summary and compaction. Cartman, its desktop `build` alias
 and Stan use cloud Sol. Project and ignored launcher overrides still take precedence;
-an update preserves them, so inspect effective routing when changing an existing project.
+updates preserve project settings and retire the exact former shared Sol pin. Inspect
+effective routing when changing an existing project.
 Model IDs are editable repo defaults, not credentials or installed models.
 
 On another machine, register providers/models and set project overrides in
