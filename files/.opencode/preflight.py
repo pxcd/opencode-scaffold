@@ -53,12 +53,14 @@ def validate_overrides(target, defaults, overrides=None):
         custom = agents.get(role, {})
         if not isinstance(custom, dict):
             raise ValueError(f'Invalid project override for {role}')
-        if role in (*coordinators, 'Stan') and custom.get('model', shared['model']) != shared['model']:
+        if role in (*coordinators, 'Stan', 'Chef') and custom.get('model', shared['model']) != shared['model']:
             raise ValueError(f'Project override conflicts with pinned {role} model')
-        if role in (*coordinators, 'Butters', 'Kyle', 'Stan'):
+        if role in (*coordinators, 'Butters', 'Kyle', 'Stan', 'Chef'):
             mode = 'primary' if role in coordinators else 'subagent'
             if custom.get('disabled') or custom.get('mode', mode) != mode:
                 raise ValueError(f'Project override disables or changes required role {role}')
+        if role == 'Chef' and ('system' in custom or 'request' in custom):
+            raise ValueError('Project override conflicts with Chef planning policy or request settings')
         if role in coordinators and 'system' in custom and custom['system'] != defaults['agents']['build']['system']:
             raise ValueError(f'Project {role} system override conflicts with the shared coordinator policy; move project constraints to project-owned AGENTS.md, PROJECT.md or native instructions before updating')
         rules = custom.get('permissions', [])
@@ -69,6 +71,8 @@ def validate_overrides(target, defaults, overrides=None):
                 raise ValueError(f'Invalid permission override for {role}')
             if rule['effect'] not in ('allow', 'ask', 'deny'):
                 raise ValueError(f'Invalid permission effect for {role}')
+            if role == 'Chef' and rule['effect'] != 'deny':
+                raise ValueError('Project override weakens Chef read-only permissions')
             if role == 'Stan' and rule['effect'] != 'deny' and any(
                     fnmatchcase(action, rule['action']) for action in
                     ('edit', 'shell', 'execute', 'subagent', 'external_directory')):
@@ -104,7 +108,8 @@ def validate_overrides(target, defaults, overrides=None):
         if role in coordinators:
             children = {r['resource'] for r in shared['permissions']
                         if r['action'] == 'subagent' and r['effect'] == 'allow'}
-            for child in sorted(children):
+            # A project can opt out of the advisory cloud route.
+            for child in sorted(children - {'Chef'}):
                 if decision('subagent', child) != 'allow':
                     raise ValueError(f'Project override blocks {role} delegation to {child}; reconcile it explicitly')
         elif role == 'Stan':

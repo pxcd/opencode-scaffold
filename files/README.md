@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Cartman + local OpenCode scaffold, version 4.3.0.
+Created with the native Sol Cartman + local OpenCode scaffold, version 4.3.4.
 
 Open the repo in OpenCode and use GPT-6.2 Sol Medium normally. Desktop's `build` primary
 entry is configured as the Cartman coordinator, with the same shared policy and
@@ -21,6 +21,8 @@ Set optional project config overrides in `.opencode/opencode.json`; root
 `opencode.json` contains managed defaults. Register machine providers/models before
 inference; endpoints/authentication stay machine-local. Butters/Kyle and
 maintenance helpers are local by default; Cartman and Stan use cloud Sol.
+Ask Cartman to consult Chef for a hard design or stalled repair. Chef gives
+read-only planning advice on cloud GPT-6.2 Astra High.
 Optional local.json worker overrides apply only through the launcher.
 
 Preview a prepared repo-local handoff:

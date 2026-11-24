@@ -629,10 +629,11 @@ class ScaffoldTests(unittest.TestCase):
         (p/'.opencode/local.json').write_text(json.dumps(profile))
         r=subprocess.run(args,capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
         preview=json.loads(r.stdout)
-        self.assertEqual(set(preview['runtime_config']['agents']),{'Cartman','Butters','Kyle','Stan','title','summary','compaction'})
+        self.assertEqual(set(preview['runtime_config']['agents']),{'Cartman','Butters','Kyle','Stan','Chef','title','summary','compaction'})
         self.assertEqual(preview['runtime_config']['agents']['Cartman']['model'],'openai/gpt-6.2-sol#medium')
+        self.assertEqual(preview['runtime_config']['agents']['Chef']['model'],'openai/gpt-6.2-astra#high')
         self.assertEqual(preview['runtime_config']['agents']['Stan']['model'],'openai/gpt-6.2-sol#medium')
-        self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n not in ('Cartman','Stan')))
+        self.assertTrue(all(a['model']=='lmstudio/test-local' for n,a in preview['runtime_config']['agents'].items() if n not in ('Cartman','Stan','Chef')))
         self.assertIn('Codex intervention is optional',preview['argv'][-1])
         self.assertNotIn('--auto',preview['argv'])
         self.assertFalse((p/'.opencode/evidence').exists())
@@ -779,6 +780,8 @@ class ScaffoldTests(unittest.TestCase):
         overrides=p/'.opencode/opencode.json'
         cases=[{'agents':{'Stan':{'disabled':True}}},
                {'agents':{'Stan':{'model':'lmstudio/wrong'}}},
+               {'agents':{'Chef':{'model':'openai/gpt-6.2-astra#medium'}}},
+               {'agents':{'Chef':{'permissions':[{'action':'custom_mcp_write','resource':'*','effect':'allow'}]}}},
                {'agents':{'Stan':{'permissions':[{'action':'shell','resource':'*','effect':'allow'}]}}},
                {'agents':{'Cartman':{'permissions':[{'action':'subagent','resource':'Stan','effect':'deny'}]}}}]
         for local in [False,True]:
@@ -1074,6 +1077,21 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
                 rules=[r for r in agents[role]['permissions'] if r['action']=='edit' and r['resource']==resource]
                 self.assertEqual(rules[-1]['effect'],'deny')
         self.assertEqual(agents['Stan']['model'],{'providerID':'openai','id':'gpt-6.2-sol','variant':'medium'})
+        chef = agents['Chef']
+        self.assertEqual(chef['mode'], 'subagent')
+        self.assertEqual(chef['model'], {'providerID':'openai','id':'gpt-6.2-astra','variant':'high'})
+        for action, resource, wanted in [
+            ('read', 'Sources/example.swift', 'allow'), ('glob', 'Sources/**', 'allow'),
+            ('grep', 'pattern', 'allow'), ('read', 'config/.env.local', 'deny'),
+            ('edit', 'Sources/example.swift', 'deny'), ('shell', 'git status', 'deny'),
+            ('external_directory', '/outside/*', 'deny'), ('execute', '*', 'deny'),
+            ('subagent', 'Butters', 'deny'), ('webfetch', 'https://example.com', 'deny'),
+            ('example_mcp_tool', '*', 'deny'),
+        ]:
+            with self.subTest(action=action, resource=resource):
+                matches = [rule['effect'] for rule in chef['permissions']
+                           if fnmatchcase(action, rule['action']) and fnmatchcase(resource, rule['resource'])]
+                self.assertEqual(matches[-1], wanted)
         for coordinator in ['Cartman','build']:
             push=[r for r in agents[coordinator]['permissions'] if r['action']=='shell' and r['resource']=='git push*']
             self.assertEqual(push[-1]['effect'],'deny')
@@ -1082,8 +1100,8 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
         self.assertIn(agents['Cartman']['system'].strip(),agents['build']['system'])
         for coordinator in ['Cartman','build']:
             rules=[r for r in agents[coordinator]['permissions'] if r['action']=='subagent']
-            self.assertEqual(rules[-4:],[{'action':'subagent','resource':'*','effect':'deny'},
-                *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['Butters','Kyle','Stan']]])
+            self.assertEqual(rules[-5:],[{'action':'subagent','resource':'*','effect':'deny'},
+                *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['Butters','Kyle','Stan','Chef']]])
         for action in ['edit','shell','execute','subagent','external_directory']:
             rules=[r for r in agents['Stan']['permissions'] if r['action']==action and r['resource']=='*']
             self.assertEqual(rules[-1]['effect'],'deny')
