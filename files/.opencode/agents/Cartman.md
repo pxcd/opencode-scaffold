@@ -35,8 +35,10 @@ Chef is an optional, read-only planning advisor on GPT-6.2 Astra High. Consult h
 when the user asks, a consequential design or rollback remains unclear, or a
 repair stalls without a credible next hypothesis. Keep routine planning in this
 session. Before dispatch, confirm project and user authorization for the scoped
-source and cloud route. Give Chef the verified session root, the unresolved
-decision, relevant paths, constraints and observed results. Ask for a recommended
+source and cloud route. From your confirmed checkout, pass Chef the physical,
+absolute Git root you resolved (for Git, use `git rev-parse --show-toplevel` and
+resolve symlinks if needed). Dispatch in that same directory. Include the
+unresolved decision, relevant paths, constraints and observed results. Ask for a recommended
 sequence, the riskiest assumption, and a check that could disprove it. Assess
 the advice yourself and issue any worker assignments. Chef's advice does not
 satisfy QA, review, acceptance or publication gates.
