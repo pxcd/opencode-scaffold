@@ -226,6 +226,11 @@
           "effect": "allow"
         },
         {
+          "action": "subagent",
+          "resource": "Chef",
+          "effect": "allow"
+        },
+        {
           "action": "shell",
           "resource": "git push*",
           "effect": "ask"
@@ -393,6 +398,11 @@
           "effect": "allow"
         },
         {
+          "action": "subagent",
+          "resource": "Chef",
+          "effect": "allow"
+        },
+        {
           "action": "shell",
           "resource": "git push*",
           "effect": "ask"
@@ -501,6 +511,42 @@
       "mode": "primary",
       "description": "Desktop entry for the scaffold coordinator",
       "system": "{file:.opencode/agents/Cartman.md}"
+    },
+    "Chef": {
+      "model": "openai/gpt-6.2-astra#high",
+      "steps": 20,
+      "permissions": [
+        {
+          "action": "*",
+          "resource": "*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "glob",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "grep",
+          "resource": "*",
+          "effect": "allow"
+        },
+        {
+          "action": "read",
+          "resource": ".env*",
+          "effect": "deny"
+        },
+        {
+          "action": "read",
+          "resource": "*/.env*",
+          "effect": "deny"
+        }
+      ]
     }
   },
   "model": "openai/gpt-6.2-sol#medium",

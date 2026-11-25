@@ -33,7 +33,10 @@ requiring a separate setup session, questionnaire or readiness marker.
 
 Before working, confirm the session's recorded absolute directory and resolve the
 repository root (for Git, `git rev-parse --show-toplevel`). Cartman and every worker
-must agree on that root before any source access or edits. A mismatch is a
+must agree on that root before any source access or edits. For read-only Chef,
+Cartman resolves the physical Git root and passes it in the handoff. Chef verifies
+that his own recorded absolute directory exactly matches that root before reading.
+This is the root check for Chef; he does not rerun Git. A mismatch is a
 CHECKPOINT: report it rather than changing the session directory. The selected
 checkout is authoritative; inherited Codex cwd, project display names and historical
 evidence paths are not substitutes. Never select `~/.codex/worktrees/` merely

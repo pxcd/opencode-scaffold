@@ -68,12 +68,14 @@ def routing(root):
             raise ValueError(f'Set a registered local model for {role}')
         if model.split('/', 1)[0] not in providers:
             raise ValueError(f'{role} model is outside local_provider_ids')
+    cloud_agents = {'Cartman': {'model': ARBITER_MODEL},
+                    'Stan': {'model': ARBITER_MODEL},
+                    'Chef': {'model': native['agents']['Chef']['model']}}
     if not profile_path.exists():
         # With no explicit launcher profile, preserve native worker/helper routes,
         # including project-authorized helper models and enabled providers.
         return {'model': ARBITER_MODEL, 'default_agent': 'Cartman',
-                'agents': {'Cartman': {'model': ARBITER_MODEL},
-                           'Stan': {'model': ARBITER_MODEL}}}
+                'agents': cloud_agents}
     return {
         'model': ARBITER_MODEL,
         'enabled_providers': list(dict.fromkeys(['openai', *providers])),
@@ -81,8 +83,7 @@ def routing(root):
         'agents': {**{name: {'model': models[name] if name in ROLES else models['Kyle']}
                    for name in (*ROLES, *HELPERS)},
                    'title': {'model': models['title']},
-                   'Cartman': {'model': ARBITER_MODEL},
-                   'Stan': {'model': ARBITER_MODEL}},
+                   **cloud_agents},
     }
 
 
@@ -119,7 +120,7 @@ def main():
             if args.session:
                 command += ['--session', args.session]
             print(json.dumps({'cwd': str(root), 'argv': command, 'runtime_config': config,
-                              'note': 'Preview only. Cartman/Stan use cloud Sol; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
+                              'note': 'Preview only. Cartman/Stan use cloud Sol and Chef uses cloud Astra; inspect effective worker/helper routes. Provider IDs do not verify endpoints.'}, indent=2))
             return 0
         if args.execute:
             if not args.routing_reviewed:
