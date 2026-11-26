@@ -3,8 +3,10 @@
     "lmstudio"
   ],
   "models": {
-    "Butters": "lmstudio/swift-1.5-qwen3.8-27b-splash",
-    "Kyle": "lmstudio/swift-1.5-qwen3.8-27b-splash",
-    "title": "lmstudio/swift-1.5-qwen3.8-27b-splash"
+    "Butters": "lmstudio/qwen/qwen3.8-27b",
+    "Kyle": "lmstudio/qwen/qwen3.8-27b",
+    "title": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+    "summary": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+    "compaction": "lmstudio/swift-1.5-qwen3.8-27b-splash"
   }
 }

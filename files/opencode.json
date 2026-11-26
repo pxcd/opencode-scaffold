@@ -65,7 +65,7 @@
   ],
   "agents": {
     "Butters": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "steps": 32,
       "permissions": [
         {
@@ -131,7 +131,7 @@
       ]
     },
     "Kyle": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "steps": 40,
       "permissions": [
         {
@@ -553,5 +553,31 @@
   "enabled_providers": [
     "openai",
     "lmstudio"
-  ]
+  ],
+  "providers": {
+    "lmstudio": {
+      "models": {
+        "qwen/qwen3.8-27b": {
+          "name": "qwen/qwen3.8-27b",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "body": {
+            "temperature": 0.2,
+            "reasoning_effort": "none"
+          }
+        }
+      }
+    }
+  }
 }

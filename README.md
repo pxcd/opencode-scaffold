@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.4
+# Native Sol Cartman + local OpenCode scaffold 4.3.5
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -26,8 +26,8 @@ models, applications, inference or project publication are started by setup.
 The native IDs are now **Cartman** (coordinator), **Butters** (all behavior/UI
 implementation), **Kyle** (fresh independent local QA) and **Stan** (fresh independent
 read-only code review). Desktop `build` loads Cartman's policy. The separate probe
-builder is retired. Butters and Kyle retain their Swift local routes; Cartman and
-Stan retain Sol. Maintenance helpers retain their existing purpose and routes.
+builder is retired. Butters and Kyle use local Qwen3.8-27B. Cartman and Stan
+retain Sol. Maintenance helpers retain their existing purpose and routes.
 
 Managed HANDOFFS.md supplies brief in-character banter at real assignments,
 acknowledgements, checkpoints and verdicts, especially Cartman theatrically blaming
@@ -61,15 +61,20 @@ for the current team. A partial new team fails instead of falling back to old ro
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
-Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch only Butters, Kyle, Stan and Chef. All subagents have delegation denied. Default local
-worker and maintenance-helper model IDs use `lmstudio/swift-1.5-qwen3.8-27b-splash`
-for Butters, Kyle, title, summary and compaction. Cartman, its desktop `build` alias
+Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch only Butters, Kyle, Stan and Chef. All subagents have delegation denied. Butters and Kyle use `lmstudio/qwen/qwen3.8-27b` with a 131,072-token
+context and `reasoning_effort: none`. Title, summary, and compaction keep
+`lmstudio/swift-1.5-qwen3.8-27b-splash`. Cartman, its desktop `build` alias
 and Stan use cloud Sol. Chef uses cloud GPT-6.2 Astra High for scoped, read-only
 planning advice when requested or when a hard design or stalled repair warrants it.
 Project and ignored launcher overrides still take precedence;
 updates preserve project settings and retire the exact former shared Sol pin. Inspect
 effective routing when changing an existing project.
-Model IDs are editable repo defaults, not credentials or installed models.
+The scaffold declares the model ID and request settings. The LM Studio provider
+endpoint and model files live on each machine. For just-in-time loading, save
+Splash as the Qwen model's engine override, set its context to 131,072 tokens and
+select `incoai/Qwen3.8-27B-DFlash2` as its draft in LM Studio. Enable Just-in-Time
+Model Loading in Model Server settings. The first request to `qwen/qwen3.8-27b`
+loads the saved engine, target, and draft configuration.
 
 On another machine, register providers/models and set project overrides in
 `.opencode/opencode.json`; keep root `opencode.json` as the managed defaults. An optional local.json, copied from local.example.json,
