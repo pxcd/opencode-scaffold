@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.4
+# Native Sol Cartman + local OpenCode scaffold 4.3.5
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
