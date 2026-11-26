@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-Created with the native Sol Cartman + local OpenCode scaffold, version 4.3.5.
+Created with the native Sol Cartman + local OpenCode scaffold, version 4.3.6.
 
 Open the repo in OpenCode and use GPT-6.2 Sol Medium normally. Desktop's `build` primary
 entry is configured as the Cartman coordinator, with the same shared policy and

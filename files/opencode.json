@@ -167,7 +167,7 @@
       ]
     },
     "compaction": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen3.8-27b-compaction",
       "permissions": [
         {
           "action": "external_directory",
@@ -177,7 +177,7 @@
       ]
     },
     "title": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "permissions": [
         {
           "action": "external_directory",
@@ -187,7 +187,7 @@
       ]
     },
     "summary": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "permissions": [
         {
           "action": "external_directory",
@@ -562,6 +562,27 @@
           "limit": {
             "context": 131072,
             "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "body": {
+            "temperature": 0.2,
+            "reasoning_effort": "none"
+          }
+        },
+        "qwen3.8-27b-compaction": {
+          "modelID": "qwen/qwen3.8-27b",
+          "name": "Qwen3.8-27B Compaction",
+          "limit": {
+            "context": 131072,
+            "output": 16384
           },
           "capabilities": {
             "tools": true,
