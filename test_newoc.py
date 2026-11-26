@@ -288,8 +288,10 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn('mode: primary',(p/'.opencode/agents/Cartman.md').read_text())
         for role in ['Butters','Kyle']:
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
-        for role in ['Butters','Kyle','title','summary','compaction']:
+        for role in ['Butters','Kyle','title','summary']:
             self.assertEqual(config['agents'][role]['model'], 'lmstudio/qwen/qwen3.8-27b')
+        self.assertEqual(config['agents']['compaction']['model'],
+                         'lmstudio/qwen3.8-27b-compaction')
         for role in ['Cartman','Stan','build']:
             self.assertEqual(config['agents'][role]['model'],'openai/gpt-6.2-sol#medium')
         profile=json.loads((p/'.opencode/local.example.json').read_text())
@@ -298,6 +300,10 @@ class ScaffoldTests(unittest.TestCase):
         qwen = config['providers']['lmstudio']['models']['qwen/qwen3.8-27b']
         self.assertEqual(qwen['limit'], {'context': 131072, 'output': 8192})
         self.assertEqual(qwen['body']['reasoning_effort'], 'none')
+        compaction = config['providers']['lmstudio']['models']['qwen3.8-27b-compaction']
+        self.assertEqual(compaction['modelID'], 'qwen/qwen3.8-27b')
+        self.assertEqual(compaction['limit'], {'context': 131072, 'output': 16384})
+        self.assertEqual(compaction['body'], qwen['body'])
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
         self.assertFalse(list(p.rglob('__pycache__')))
 

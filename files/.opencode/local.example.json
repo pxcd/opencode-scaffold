@@ -7,6 +7,6 @@
     "Kyle": "lmstudio/qwen/qwen3.8-27b",
     "title": "lmstudio/qwen/qwen3.8-27b",
     "summary": "lmstudio/qwen/qwen3.8-27b",
-    "compaction": "lmstudio/qwen/qwen3.8-27b"
+    "compaction": "lmstudio/qwen3.8-27b-compaction"
   }
 }
