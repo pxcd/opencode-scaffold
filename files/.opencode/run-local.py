@@ -62,7 +62,9 @@ def routing(root):
         raise ValueError('local_provider_ids must list reviewed local provider IDs')
     if profile_path.exists():
         models['title'] = models.get('title', models.get('probe', native['agents']['title']['model']))
-    for role in (*ROLES, 'title') if profile_path.exists() else ROLES:
+        for role in ('compaction', 'summary'):
+            models.setdefault(role, models.get('Kyle'))
+    for role in (*ROLES, *HELPERS) if profile_path.exists() else ROLES:
         model = models.get(role)
         if not isinstance(model, str) or '/' not in model or 'REPLACE' in model or any(c.isspace() for c in model):
             raise ValueError(f'Set a registered local model for {role}')
@@ -80,9 +82,7 @@ def routing(root):
         'model': ARBITER_MODEL,
         'enabled_providers': list(dict.fromkeys(['openai', *providers])),
         'default_agent': 'Cartman',
-        'agents': {**{name: {'model': models[name] if name in ROLES else models['Kyle']}
-                   for name in (*ROLES, *HELPERS)},
-                   'title': {'model': models['title']},
+        'agents': {**{name: {'model': models[name]} for name in (*ROLES, *HELPERS)},
                    **cloud_agents},
     }
 
