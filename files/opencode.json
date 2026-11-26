@@ -167,7 +167,7 @@
       ]
     },
     "compaction": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "permissions": [
         {
           "action": "external_directory",
@@ -177,7 +177,7 @@
       ]
     },
     "title": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "permissions": [
         {
           "action": "external_directory",
@@ -187,7 +187,7 @@
       ]
     },
     "summary": {
-      "model": "lmstudio/swift-1.5-qwen3.8-27b-splash",
+      "model": "lmstudio/qwen/qwen3.8-27b",
       "permissions": [
         {
           "action": "external_directory",

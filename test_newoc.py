@@ -288,11 +288,8 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn('mode: primary',(p/'.opencode/agents/Cartman.md').read_text())
         for role in ['Butters','Kyle']:
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
-        for role in ['Butters','Kyle']:
+        for role in ['Butters','Kyle','title','summary','compaction']:
             self.assertEqual(config['agents'][role]['model'], 'lmstudio/qwen/qwen3.8-27b')
-        for role in ['title','summary','compaction']:
-            self.assertEqual(config['agents'][role]['model'],
-                             'lmstudio/swift-1.5-qwen3.8-27b-splash')
         for role in ['Cartman','Stan','build']:
             self.assertEqual(config['agents'][role]['model'],'openai/gpt-6.2-sol#medium')
         profile=json.loads((p/'.opencode/local.example.json').read_text())
