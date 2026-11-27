@@ -7,4 +7,3 @@
 - Remaining manual acceptance:
 
 ## Scope and risks
-
