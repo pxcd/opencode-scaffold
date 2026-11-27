@@ -5,3 +5,4 @@ __pycache__/
 .artifacts/
 # Retained historical machine-specific verification logs, not portable source.
 /tests/
+.opencode/evidence/
