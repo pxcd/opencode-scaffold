@@ -80,8 +80,8 @@ export async function install(ctx, now = Date.now) {
       const state = old && structuredClone(old);
       if (input.action === 'status') return { content: JSON.stringify(state ?? { phase: 'unarmed' }) };
       if (input.action === 'start') {
-        if (old && old.phase !== 'complete' && !old.freshInput)
-          throw new Error('Preserve the existing plan; blocked/paused work needs fresh user input');
+        if (old && old.phase !== 'complete')
+          throw new Error('Preserve the existing plan; reconcile or rebind unfinished work before continuing');
         const goal = text(input.goal, 'goal', 1000);
         if (!Array.isArray(input.milestones) || !input.milestones.length || input.milestones.length > 32)
           throw new Error('Register 1–32 milestones covering the full authorized task');
@@ -97,7 +97,8 @@ export async function install(ctx, now = Date.now) {
       if (state.root !== root && input.action !== 'rebind')
         throw new Error('Checkpoint belongs to another checkout; rebind only after an authorized native move');
       if (input.action === 'rebind') {
-        if (state.phase !== 'active' || state.root === root) throw new Error('Rebind requires an active task and an actual checkout change');
+        if (!['active', 'paused'].includes(state.phase) || state.root === root)
+          throw new Error('Rebind requires an active or paused task and an actual checkout change');
         state.reason = text(input.reason, 'authorized move reason');
         state.nextAction = text(input.next_action, 'next_action');
         state.root = root; // State transfer only: this tool never moves a session or grants access.
@@ -134,7 +135,7 @@ export async function install(ctx, now = Date.now) {
         } else throw new Error('Unknown checkpoint action');
       }
       await put(id, state);
-      if (input.action === 'resume' || input.action === 'rebind') clear(id, version);
+      if (input.action === 'resume' || (input.action === 'rebind' && state.phase === 'active')) clear(id, version);
       return { content: JSON.stringify(state) };
     });
   }

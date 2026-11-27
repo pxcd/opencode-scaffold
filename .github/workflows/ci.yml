@@ -42,5 +42,5 @@ jobs:
           tar -xzf "$archive" -C "$tools_dir" gitleaks
           PATH="$tools_dir:$PATH" python3.12 -m unittest -v test_secret_scan
       - run: python3.12 .github/scripts/test-scaffold-ci.py
-      - run: node --test files/.opencode/plugins/step-limit-compat/normalize.test.mjs files/.opencode/plugins/continuation-guard/guard.test.mjs
+      - run: node --test files/.opencode/plugins/*/*.test.mjs
       - run: node --test .github/scripts/ai-review.test.cjs

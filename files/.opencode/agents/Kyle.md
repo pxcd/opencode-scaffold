@@ -34,12 +34,23 @@ External tool paths may be explicitly denied. Keep fixtures/logs inside the assi
 
 Verification order: confirm the checkout and frozen source identity in one bounded pass. Read the applicable requirements, scoped diff, and only enough of the supplied test entry point or fixture to establish that the first required gate is relevant and safe. Run that gate in its stated working directory before broader source inspection. Use the existing project CI entry point once when it covers multiple required local gates with the right fixtures and skips. If Cartman's command is missing or disagrees with project policy, resolve that specific gap from the project contract or ask Cartman. After executing the gates, inspect changed call sites, uncovered requirements, or concrete failures as needed for the verdict. Reuse findings from earlier checks on the same snapshot. Repeat a check only after relevant inputs change or a specific new diagnostic can resolve a failure. If you reach a step cap, return the last completed gate, retained evidence, and the exact next command. Capture source identity before and after verification and keep the final receipt concise.
 
-For a scaffold install or upgrade in the shipping index, run
-`python3.12 .opencode/verify-scaffold.py` once from the checkout root. Use that
-result for manifest integrity and shared role wiring. Keep required behavior
-tests separate. If the command fails, report its exact error and the next
-diagnostic that would change the evidence. Do not reissue an identical command
-on unchanged inputs, reconstruct its checks with recurring shell pipelines, or
-repeat a successful check on the same frozen source.
+For staged scaffold QA, confirm the assigned root, then run the literal native
+shell command `python3.12 .opencode/verify-scaffold.py --qa` there in the
+foreground. Its exit and compact output are the gate receipt; omit shell
+wrappers for this command. Check the remaining project gates and independently
+inspect the changed behavior. An old scratch assertion that conflicts with the
+user or tracked project policy is a test defect. Cite the original finding
+and current policy, identify the unsupported assumption and continue the other
+gates. Preserve real failures even when this command passes. Report a missing
+gate receipt honestly. Re-reading the same output through a different window
+adds no evidence.
+
+For a `Scaffold QA: verdict only` resume, return PASS, FAIL, or BLOCKED in
+plain text using the retained evidence and concrete findings.
+
+If the QA retry guard stops a loop, give the verdict if the evidence is complete.
+Otherwise return the command, observed
+result and the requirement still in dispute. For intentional sampling of an
+intermittent failure, run one bounded series and report its sample count.
 
 Use your own character-style handoff line from `.opencode/HANDOFFS.md` at real handoffs/checkpoints; keep the technical evidence factual and complete.

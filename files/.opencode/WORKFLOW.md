@@ -172,6 +172,22 @@ consumer checkout, record the finding and stop that repair there. Apply the
 upstream fix through `newoc` when authorized. Project-owned instructions and
 configuration overrides still follow the project's own workflow.
 
+For a scaffold installation or upgrade, start the native Kyle handoff with
+`Scaffold QA: staged` on its own line. After confirming the checkout and frozen
+scope, Kyle's first executable gate is `python3.12 .opencode/verify-scaffold.py --qa`.
+Its receipt covers the staged manifest, coordinator wiring and override regressions,
+and the managed plugin suites. Run the project's other applicable gates as well.
+The managed Cartman and Desktop build defaults match. Project step limits may
+differ; each must be a positive integer. Coordinator permission overrides must match.
+
+When verifying a repair, give Kyle the original reviewer's precise finding
+and revision, with the relevant user or tracked project requirement. Keep the
+observable defect separate from a proposed remedy. A scratch probe or previous
+handoff may supply evidence but cannot establish a new requirement. If its
+assertion conflicts with the written contract, correct the QA assignment and
+resume the pending gates on the same snapshot. Preserve any independently
+supported defect and seek a decision only for a genuine unresolved policy conflict.
+
 1. Run the project's relevant verification and obtain independent Kyle QA.
    Before publication, scan the staged tree and branch history locally with
    `python3 -I .opencode/scan-gitleaks.py ship <verified-base-oid> <head-oid>`.

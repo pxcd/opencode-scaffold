@@ -142,7 +142,7 @@ test('stall guard reports incomplete once and cannot be self-rearmed', async t =
   for (let i = 0; i < 5; i++) await f.idle();
   assert.equal(f.state().phase, 'blocked'); assert.equal(f.notices.length, 4);
   assert.match(f.notices.at(-1).text, /No milestone progress/);
-  await assert.rejects(f.start(), /fresh user/);
+  await assert.rejects(f.start(), /Preserve the existing plan/);
 });
 test('changing next-action prose does not count as milestone progress', async t => {
   const f = await fixture(t); await f.start();
@@ -184,6 +184,18 @@ test('malformed plans cannot arm a loop or erase pending scope', async t => {
   await assert.rejects(f.call({ action: 'progress', completed: ['unknown'], evidence: 'x', next_action: 'x' }), /Unknown/);
 });
 
+test('new user input cannot replace an unfinished plan or its receipts', async t => {
+  const f = await fixture(t); await f.start();
+  await f.call({ action: 'progress', completed: ['repair'], evidence: 'Repair verified', next_action: 'QA' });
+  await f.idle();
+  await f.prompt();
+  const paused = structuredClone(f.state());
+  await assert.rejects(f.start(), /Preserve the existing plan/);
+  assert.deepEqual(f.state(), paused);
+  await f.call({ action: 'resume', next_action: 'Finish QA' });
+  assert.deepEqual(f.state().milestones, paused.milestones);
+});
+
 test('authorized native checkout move can retain the full plan without resetting budgets', async t => {
   const shared = new Map(); const first = await fixture(t, shared); await first.start(); await first.idle();
   const second = await fixture(t, shared, root + '/..');
@@ -193,6 +205,26 @@ test('authorized native checkout move can retain the full plan without resetting
   assert.equal(second.state().milestones.length, 2); assert.equal(second.state().resumes, 1);
   await second.delegate(); await second.idle(); assert.equal(second.notices.length, 1);
   await first.idle(); assert.equal(first.notices.length, 1); // Old-root hook cannot resume it.
+});
+
+test('a prompt before rebinding preserves the paused checkpoint and its budget', async t => {
+  const shared = new Map(); const first = await fixture(t, shared); await first.start();
+  await first.call({ action: 'progress', completed: ['repair'], evidence: 'Repair verified', next_action: 'QA' });
+  await first.idle(); await first.idle();
+  const second = await fixture(t, shared, root + '/..');
+  await second.prompt();
+  const paused = structuredClone(second.state());
+  await assert.rejects(second.call({ action: 'resume', next_action: 'QA' }), /another checkout/);
+  await assert.rejects(second.start(), /Preserve the existing plan/);
+  await second.call({ action: 'rebind', reason: 'Authorized native checkout move', next_action: 'QA' });
+  for (const field of ['phase', 'freshInput', 'milestones', 'resumes', 'stalls', 'started']) {
+    assert.deepEqual(second.state()[field], paused[field]);
+  }
+  await assert.rejects(second.delegate(), /register\/resume/);
+  await second.idle();
+  assert.equal(second.notices.length, 0);
+  await second.call({ action: 'resume', next_action: 'QA' });
+  await second.delegate();
 });
 
 for (const type of ['session.execution.interrupted', 'session.execution.failed'])

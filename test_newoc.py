@@ -34,7 +34,9 @@ class ScaffoldTests(unittest.TestCase):
         manifest = json.loads((project / '.opencode/scaffold.json').read_text())
         self.assertIn('./.opencode/plugins/continuation-guard', config['plugins'])
         self.assertIn('.opencode/CONTINUATION.md', config['instructions'])
-        for name in ['.opencode/CONTINUATION.md', '.opencode/plugins/continuation-guard/index.js']:
+        self.assertIn('./.opencode/plugins/qa-retry-guard', config['plugins'])
+        for name in ['.opencode/CONTINUATION.md', '.opencode/plugins/continuation-guard/index.js',
+                     '.opencode/plugins/qa-retry-guard/index.js']:
             self.assertEqual(manifest['files'][name], hashlib.sha256((project / name).read_bytes()).hexdigest())
 
     def run_tool(self, *args, cwd=None):
@@ -68,6 +70,7 @@ class ScaffoldTests(unittest.TestCase):
         result = verify()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('staged manifest SHA-256 digests', result.stdout)
+        self.assertIn('Positive project limits may differ', result.stdout)
         stage('opencode.json')
         verify_failure("Manifest SHA-256 mismatch in Git index: 'opencode.json'")
 
@@ -84,7 +87,165 @@ class ScaffoldTests(unittest.TestCase):
             {'action': 'shell', 'resource': 'git push*', 'effect': 'deny'},
         ]}}}))
         stage('opencode.json', '.opencode/scaffold.json', '.opencode/opencode.json')
-        verify_failure('project permissions must match across Cartman and build')
+        verify_failure('Mirror coordinator permission overrides')
+
+        settings = (
+            ({'disabled': True}, 'disables or changes required role build'),
+            ({'mode': 'subagent'}, 'disables or changes required role build'),
+            ({'model': 'openai/another-model'}, 'conflicts with pinned build model'),
+            ({'system': 'Different policy'}, 'conflicts with the shared coordinator policy'),
+            ({'steps': 0}, 'Invalid project step limit for build'),
+        )
+        for override, error in settings:
+            with self.subTest(override=override):
+                overrides_path.write_text(json.dumps({'agents': {'build': override}}))
+                stage('.opencode/opencode.json')
+                overrides_path.write_text('{}')
+                verify_failure(error)
+
+        overrides_path.write_text(json.dumps({'agents': {'Cartman': {'steps': 51}, 'Butters': {
+            'model': 'lmstudio/custom',
+        }}}))
+        stage('.opencode/opencode.json')
+        result = verify()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Valid project step limits: Cartman=51, build=', result.stdout)
+
+    def test_scaffold_qa_runs_managed_staged_suites_and_reports_real_failures(self):
+        result = self.run_tool('qa-index', '--root', str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        project = self.root / 'qa-index'
+        suite = Path('.opencode/plugins/qa-retry-guard/guard.test.mjs')
+        manifest_path = Path('.opencode/scaffold.json')
+        manifest = json.loads((project / manifest_path).read_bytes())
+        extra = Path('.opencode/plugins/extra/managed.test.mjs')
+        (project / extra).parent.mkdir()
+        (project / extra).write_text("import test from 'node:test';\ntest('extra behavior', () => {});\n")
+        manifest['files'][str(extra)] = hashlib.sha256((project / extra).read_bytes()).hexdigest()
+        (project / manifest_path).write_text(json.dumps(manifest))
+        plugin = project / '.opencode/plugins/step-limit-compat/normalize.mjs'
+        evidence = project / '.opencode/evidence'
+        (project / 'package.json').write_text('{"type":"commonjs"}')
+        self.git(project, 'add', '--', '.opencode', 'opencode.json')
+
+        def qa():
+            return subprocess.run(['python3.12', '.opencode/verify-scaffold.py', '--qa'],
+                                  cwd=project, capture_output=True, text=True)
+
+        # The outgoing suite and imports must both come from the index.
+        failure = "import test from 'node:test';\ntest('fixture', () => { throw Error('QA failure fixture') });\n"
+        (project / suite).write_text(failure)
+        plugin.write_text('throw Error("unstaged implementation loaded");\n')
+        custom = project / '.opencode/plugins/project-only.test.mjs'
+        custom.write_text('throw Error("project test outside scaffold scope");\n')
+        self.git(project, 'add', '--', str(custom.relative_to(project)))
+        result = qa()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('PASS: staged scaffold QA', result.stdout)
+        self.assertIn('accepted 80/60 project limits', result.stdout)
+        self.assertRegex(result.stdout, r'(?m)^# pass [1-9]\d*$')
+        self.assertIn(str(suite), result.stdout)
+        self.assertIn(str(extra), result.stdout)
+        self.assertNotIn('project-only', result.stdout)
+        self.assertEqual(list(evidence.iterdir()), [])
+        self.assertEqual((project / suite).read_text(), failure)
+        self.assertIn('unstaged implementation', plugin.read_text())
+
+        manifest['files'][str(suite)] = hashlib.sha256((project / suite).read_bytes()).hexdigest()
+        (project / manifest_path).write_text(json.dumps(manifest))
+        self.git(project, 'add', '--', str(suite), str(manifest_path))
+        (project / suite).write_text("console.log('success');\n")
+        result = qa()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('QA failure fixture', result.stderr)
+        self.assertNotIn('PASS:', result.stdout)
+        self.assertEqual(list(evidence.iterdir()), [])
+
+        self.git(project, 'rm', '--cached', '-f', '--', str(suite))
+        result = qa()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f'Missing from Git index: {str(suite)!r}', result.stderr)
+        self.assertNotIn('Running', result.stdout)
+
+        del manifest['files'][str(suite)]
+        (project / manifest_path).write_text(json.dumps(manifest))
+        self.git(project, 'add', '--', str(manifest_path))
+        result = qa()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(f'Missing required staged scaffold plugin suites: {suite}', result.stderr)
+        self.assertNotIn('Running', result.stdout)
+
+    def test_scaffold_qa_refuses_external_scratch_and_index_drift(self):
+        result = self.run_tool('qa-boundary', '--root', str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        project = self.root / 'qa-boundary'
+        self.git(project, 'add', '--', '.opencode', 'opencode.json')
+        command = ['python3.12', '.opencode/verify-scaffold.py', '--qa']
+        outside = self.root / 'outside'
+        outside.mkdir()
+        evidence = project / '.opencode/evidence'
+        evidence.symlink_to(outside, target_is_directory=True)
+        result = subprocess.run(command, cwd=project, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Refusing symlink', result.stderr)
+        self.assertEqual(list(outside.iterdir()), [])
+        evidence.unlink()
+
+        # Simulate staging new project overrides while the Node subprocess runs.
+        (project / '.opencode/opencode.json').write_text('{"agents":{}}')
+        bin_dir = self.root / 'bin'
+        bin_dir.mkdir()
+        node = bin_dir / 'node'
+        node.write_text('#!/bin/sh\nset -e\ngit -C "$QA_FIXTURE" add -- .opencode/opencode.json\n'
+                        'PATH="$ORIGINAL_PATH" exec node "$@"\n')
+        node.chmod(0o755)
+        env = {**os.environ, 'QA_FIXTURE': str(project), 'ORIGINAL_PATH': os.environ['PATH'],
+               'PATH': str(bin_dir) + os.pathsep + os.environ['PATH']}
+        result = subprocess.run(command, cwd=project, env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Scaffold index changed during QA', result.stderr)
+        self.assertNotIn('PASS: staged scaffold QA', result.stdout)
+
+        node.write_text('#!/bin/sh\necho PASS\n')
+        result = subprocess.run(command, cwd=project, env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('without TAP totals', result.stderr)
+
+    def test_scaffold_qa_probes_the_staged_validator_without_real_project_overrides(self):
+        result = self.run_tool('qa-policy', '--root', str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        project = self.root / 'qa-policy'
+        self.git(project, 'add', '--', '.opencode', 'opencode.json')
+        helper = project / '.opencode/preflight.py'
+        manifest = project / '.opencode/scaffold.json'
+        record = json.loads(manifest.read_text())
+        original = helper.read_text()
+        command = ['python3.12', '.opencode/verify-scaffold.py', '--qa']
+        for regression, error in [
+            ('return {}', 'Invalid synthetic build override was accepted'),
+            ('if overrides.get("agents"): raise ValueError("disallowed custom limits")\n    return {}',
+             'Valid asymmetric project step limits (80/60) were rejected'),
+        ]:
+            with self.subTest(error=error):
+                helper.write_text(original + '\ndef validate_coordinator_overrides(defaults, overrides):\n'
+                                  + '    ' + regression + '\n')
+                record['files']['.opencode/preflight.py'] = hashlib.sha256(helper.read_bytes()).hexdigest()
+                manifest.write_text(json.dumps(record))
+                self.git(project, 'add', '--', '.opencode/preflight.py', '.opencode/scaffold.json')
+                result = subprocess.run(command, cwd=project, capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(error, result.stderr)
+                self.assertNotIn('Running', result.stdout)
+        self.assertEqual(json.loads((project / '.opencode/opencode.json').read_text()), {})
+
+        script = project / '.opencode/verify-scaffold.py'
+        alias = self.root / 'identical-verifier.py'
+        alias.write_bytes(script.read_bytes())
+        script.unlink()
+        script.symlink_to(alias)
+        result = subprocess.run(command, cwd=project, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('regular file matching the staged QA entry point', result.stderr)
 
     def test_pr_template_whitespace_repair_only_updates_the_exact_starter(self):
         relative = Path('.github/PULL_REQUEST_TEMPLATE.md')

@@ -61,7 +61,8 @@
   ],
   "plugins": [
     "./.opencode/plugins/step-limit-compat",
-    "./.opencode/plugins/continuation-guard"
+    "./.opencode/plugins/continuation-guard",
+    "./.opencode/plugins/qa-retry-guard"
   ],
   "agents": {
     "Butters": {

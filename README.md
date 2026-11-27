@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.9
+# Native Sol Cartman + local OpenCode scaffold 4.3.15
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -204,9 +204,11 @@ exceptions remain in each project's AGENTS.md. Keep the live template checkout
 on main between tasks: `newoc` reads its working files, including uncommitted edits.
 
 For a scaffold install or upgrade staged in a project, run
-`python3.12 .opencode/verify-scaffold.py` from that checkout root. It compares
-SHA-256 digests and role wiring using Git index content. Run project behavior
-tests and runtime routing checks separately when required.
+`python3.12 .opencode/verify-scaffold.py --qa` from the checkout root. This
+checks indexed SHA-256 digests, role wiring and representative coordinator
+overrides, then runs the managed plugin tests from staged bytes. The receipt
+includes test counts and scaffold identities. Without `--qa` the command keeps its
+manifest and role checks. Project gates and independent source review still apply.
 
 Say **“Release the scaffold as vX.Y.Z”** to authorize the PR, required review and
 checks, squash merge, publication of that version tag, and completed-branch cleanup.
@@ -233,6 +235,7 @@ or editing this repository. Validate changes before generating or updating proje
 python3.12 -m unittest -v test_newoc.py
 NEWOC_NATIVE_TESTS=1 python3.12 -m unittest -v test_newoc.ScaffoldTests.test_native_layers_preserve_models_steps_permissions_and_plugins
 node --test files/.opencode/plugins/step-limit-compat/normalize.test.mjs
+node --test files/.opencode/plugins/qa-retry-guard/guard.test.mjs
 python3.12 deploy.py                 # preview installed-starter replacement
 python3.12 deploy.py --apply         # explicit deployment; retain previous backup
 ```
@@ -404,13 +407,26 @@ twelve automatic nudges, or a 24-hour activation window. A bounded stop is repor
 as incomplete/blocked, never acceptance. Progress evidence remains a coordinator
 claim; this is not an independent QA verifier or an OS-enforced execution budget.
 
+When the /ship v1 confirmation includes `.opencode/scaffold.json` among its
+committed or staged files, the QA guard marks Cartman's native Kyle handoff.
+For manual scaffold QA, start the assignment with the line `Scaffold QA: staged`. Kyle can inspect the source first. His first shell
+gate uses the native verifier with `--qa` under normal OpenCode permissions.
+The gate supplies execution evidence; Kyle still issues the independent verdict.
+
+Repeated identical foreground shell calls, three matching prefix reads, or two
+empty pages from the same diff end tool use for that turn. If only the verdict
+is missing, Cartman resumes the same Kyle with `Scaffold QA: verdict only`.
+The tool-free turn reuses a recorded zero exit only when the staged snapshot
+still matches. Kyle must return his own evidence-based verdict.
+For intentional sampling of an intermittent failure, run a bounded series.
+
 Interruption monitoring and idle continuation were exercised with OpenCode 2.3.0
 using a loopback fake model. The hook is experimental; revalidate native compatibility
 on upgrades. These commands use isolated fixtures and no real model inference:
 
 ```sh
 node --test files/.opencode/plugins/continuation-guard/guard.test.mjs
-NEWOC_NATIVE_TESTS=1 python3.12 -B -m unittest -v test_continuation_native.py
+NEWOC_NATIVE_TESTS=1 python3.12 -B -m unittest -v test_continuation_native.py test_scaffold_qa_native.py
 ```
 
 Existing deployed projects are unchanged until a separately authorized update.
