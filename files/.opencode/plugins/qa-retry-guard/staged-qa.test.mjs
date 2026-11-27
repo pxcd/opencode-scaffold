@@ -9,7 +9,9 @@ const marker = 'Scaffold QA: staged';
 const ship = { version: 1, snapshot: 'fixture-id', branch: 'feature', head: 'fixture-head' };
 
 const receipt = 'PASS: staged scaffold QA (manifest 111, project overrides 222, verifier 333, plugin suite exit 0)';
-const staged = identity => identity && { identity, receipt };
+const verifier = 'a'.repeat(40);
+const staged = identity => identity && { identity, receipt, verifier };
+const pinned = 'git --no-replace-objects --no-optional-locks cat-file blob ' + verifier + ' | python3.12 -I - --qa';
 
 async function host(data = new Map(), snapshot = async () => staged('tree-a')) {
   const hooks = {};
@@ -76,7 +78,7 @@ test('only a real new task resets a marked Kyle, including across a plugin reloa
       { command, workdir: '/other' }, { command: command + ' || true' }]) {
     await assert.rejects(h.before('Kyle', 'shell', input), /before other executable checks/);
   }
-  await h.before('Kyle', 'shell', { command });
+  assert.equal((await h.before('Kyle', 'shell', { command })).command, pinned);
   await assert.rejects(h.before('Kyle', 'shell', { command }, 'duplicate'), /before other executable checks/);
   const ordinary = await h.prompt('next', 'Review this product code. The docs contain ' + marker);
   assert.ok((await h.context('Kyle', [ordinary])).edit);
@@ -137,3 +139,30 @@ for (const [label, exit, after, current, valid] of [
     await assert.rejects(resumed.before('Kyle', 'shell', { command }), /before other executable checks/);
   });
 }
+
+
+test('same-snapshot ordinary resume keeps other checks available without rerunning the verifier', async () => {
+  const data = new Map();
+  let identity = 'tree-a';
+  let h = await host(data, async () => staged(identity));
+  const handoff = await h.prompt('qa', marker);
+  await h.context('Kyle', [handoff]);
+  await h.before('Kyle', 'shell', { command });
+  await h.after('completed', { exitCode: 0, output: receipt });
+
+  h = await host(data, async () => staged(identity));
+  const resume = await h.prompt('resume', marker + '\nRun the remaining check.');
+  const request = await h.request('Kyle', [handoff, resume]);
+  assert.equal(request.tools.shell.input.properties.command.enum, undefined);
+  assert.match(request.system.at(-1).text, /already has a verified/);
+  assert.equal((await h.before('Kyle', 'shell', { command: 'git diff --cached --check' })).command,
+    'git diff --cached --check');
+  for (const duplicate of [command, pinned]) {
+    await assert.rejects(h.before('Kyle', 'shell', { command: duplicate }), /already earned/);
+  }
+
+  identity = 'tree-b';
+  const next = await h.prompt('changed', marker);
+  assert.deepEqual((await h.context('Kyle', [next])).shell.input.properties.command.enum, [command]);
+  assert.equal((await h.before('Kyle', 'shell', { command })).command, pinned);
+});

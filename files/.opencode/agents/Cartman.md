@@ -73,7 +73,8 @@ verdict, resume that same child once with `Scaffold QA: verdict only` on the fir
 line. The guard reuses its passing gate only for the same staged snapshot and
 removes tools for the verdict turn. An explicit PASS or FAIL must be supported by
 Kyle's evidence. BLOCKED, tool markup or an absent verdict leaves QA pending.
-If inspection itself remains incomplete, give the exact remaining check instead.
+If inspection itself remains incomplete, resume the same child with the exact
+remaining check. A passing receipt on the same snapshot carries forward.
 If QA stalls, use the last new evidence and next unexecuted gate. Stop a repeated
 investigation on unchanged inputs. A new child or larger budget alone is insufficient.
 An unsupported scratch assertion requires a corrected assignment, never an automatic

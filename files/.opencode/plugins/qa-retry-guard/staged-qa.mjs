@@ -7,6 +7,13 @@ const MARKER = 'Scaffold QA: staged';
 const VERDICT = 'Scaffold QA: verdict only';
 const VERIFIER = '.opencode/verify-scaffold.py';
 const COMMAND = 'git --no-optional-locks show :' + VERIFIER + ' | python3.12 -I - --qa';
+const PINNED_PREFIX = 'git --no-replace-objects --no-optional-locks cat-file blob ';
+const GATE_SUFFIX = ' | python3.12 -I - --qa';
+
+function pinnedCommand(oid) {
+  return PINNED_PREFIX + oid + GATE_SUFFIX;
+}
+
 const OVERRIDES = '.opencode/opencode.json';
 const MANIFEST = '.opencode/scaffold.json';
 const READS = new Set(['read', 'glob', 'grep']);
@@ -43,11 +50,13 @@ async function stagedIdentity(root) {
       const match = /^(100644|100755) ([a-f0-9]+) 0\t(.+)$/.exec(record);
       if (match) blobs.set(match[3], match[2]);
     }
-    if (!blobs.has(VERIFIER) || !blobs.has(MANIFEST)) return undefined;
+    const verifier = blobs.get(VERIFIER);
+    if (!verifier || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(verifier)
+        || !blobs.has(MANIFEST)) return undefined;
     const receipt = 'PASS: staged scaffold QA (manifest ' + blobs.get(MANIFEST)
       + ', project overrides ' + (blobs.get(OVERRIDES) ?? 'absent')
-      + ', verifier ' + blobs.get(VERIFIER) + ', plugin suite exit 0)';
-    return { identity: createHash('sha256').update(head.stdout).update(index.stdout).digest('hex'), receipt };
+      + ', verifier ' + verifier + ', plugin suite exit 0)';
+    return { identity: createHash('sha256').update(head.stdout).update(index.stdout).digest('hex'), verifier, receipt };
   } catch {
     return undefined;
   }
@@ -87,7 +96,11 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
         state = { ...state, assignment: task.id, phase: 'verdict' };
         await ctx.storage.set(key(id), state);
       } else if (task.metadata[FIELD] === (primary ? 'ship' : 'gate')) {
-        state = { assignment: task.id, phase: primary ? 'ship' : 'pending' };
+        const verified = !primary && state?.verifiedPinned;
+        const current = verified ? await snapshot(root) : undefined;
+        state = verified && current?.identity === verified
+          ? { assignment: task.id, phase: 'finished', verifiedPinned: verified }
+          : { assignment: task.id, phase: primary ? 'ship' : 'pending' };
         await ctx.storage.set(key(id), state);
       } else if (state) {
         await ctx.storage.remove(key(id));
@@ -100,15 +113,21 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
       return;
     }
 
-    if (!state || state.phase === 'finished') { guarded.delete(id); return; }
+    if (!state) { guarded.delete(id); return; }
     guarded.set(id, state);
+    if (state.phase === 'finished') {
+      if (state.verifiedPinned) request.system.push({ type: 'text', text:
+        'This Kyle session already has a verified staged QA receipt. Use it for the same snapshot. '
+        + 'Run only any remaining checks and return the independent verdict.' });
+      return;
+    }
     const pending = state.phase === 'pending';
     for (const name of Object.keys(request.tools)) {
       if (!pending || (name !== 'shell' && !READS.has(name))) delete request.tools[name];
     }
     if (state.phase === 'verdict') {
       const identity = await snapshot(root);
-      const reusable = Boolean(state.verified && identity?.identity === state.verified);
+      const reusable = Boolean(state.verifiedPinned && identity?.identity === state.verifiedPinned);
       const instruction = reusable
         ? 'Give your independent QA verdict as plain text now. Start with PASS, FAIL, or BLOCKED. Use your recorded verifier exit 0 and your existing source inspection. Name concrete findings or missing evidence. If evidence is incomplete, return BLOCKED and name the exact gap. No tools are available. Do not emit tool-call markup.'
         : 'Return BLOCKED in plain text. There is no verified passing gate for the current staged snapshot. Tell Cartman to start staged QA on the current snapshot.';
@@ -139,6 +158,16 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     }
     const state = guarded.get(event.sessionID);
     if (event.agent !== 'Kyle' || !state) return;
+    if (state.phase === 'finished') {
+      const command = event.input?.command;
+      if (state.verifiedPinned && event.tool === 'shell'
+          && (command === COMMAND || (typeof command === 'string' && command.startsWith(PINNED_PREFIX)
+              && command.endsWith(GATE_SUFFIX)))) {
+        throw new Error('This assignment already earned a passing staged QA receipt. Reuse it on the same snapshot; '
+          + 'start fresh staged QA if the snapshot changed.');
+      }
+      return;
+    }
     if (state.phase === 'pending' && READS.has(event.tool)) return;
     if (state.phase !== 'pending' || event.tool !== 'shell' || !canonical(event.input, root)) {
       throw new Error('Staged scaffold QA must run ' + COMMAND + ' at the checkout root before other executable checks.');
@@ -154,6 +183,9 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
       throw new Error('Unable to identify the regular staged verifier and scaffold manifest.');
     }
     running.before = before;
+    // Resolve the path only in the captured index listing. Execution uses that
+    // immutable object ID even if another process briefly replaces the index.
+    event.input = { ...event.input, command: pinnedCommand(before.verifier) };
     await ctx.storage.set(key(event.sessionID), running);
   });
   await ctx.tool.hook('execute.after', async event => {
@@ -167,15 +199,14 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
       if (after?.identity === state.before.identity
           && typeof output.output === 'string'
           && output.output.split(/\r?\n/).includes(state.before.receipt)) {
-        updated.verified = state.before.identity;
+        updated.verifiedPinned = state.before.identity;
       } else {
         updated.phase = 'blocked';
       }
     }
     // A nonzero exit is a completed, failed check. Kyle can diagnose it;
     // a denial or an unfinished/background command carries no such receipt.
-    if (updated.phase === 'finished') guarded.delete(event.sessionID);
-    else guarded.set(event.sessionID, updated);
+    guarded.set(event.sessionID, updated);
     await ctx.storage.set(key(event.sessionID), updated);
   });
 }
