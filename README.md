@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.7
+# Native Sol Cartman + local OpenCode scaffold 4.3.8
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -194,12 +194,26 @@ loading with hand-maintained directory allowlists.
 For this scaffold repository, use one focused branch, a coherent commit and a PR
 to main. Run the generator/update tests, native config discovery and hook tests;
 obtain fresh independent review of the final commit and satisfy the hosted gates.
-After explicit merge authorization, squash-merge remotely, fast-forward local main,
-smoke-test disposable project generation/update, then delete only the completed
-branch and publish the accepted version tag. No project migration is implied.
+After explicit merge authorization, squash-merge remotely, update local `main`,
+smoke-test disposable project generation/update, then delete the completed branch.
+No project migration is implied.
 The shared SCM policy is in `files/.opencode/WORKFLOW.md`; project-specific
 exceptions remain in each project's AGENTS.md. Keep the live template checkout
 on main between tasks: `newoc` reads its working files, including uncommitted edits.
+
+Say **“Release the scaffold as vX.Y.Z”** to authorize the PR, required review and
+checks, squash merge, publication of that version tag, and completed-branch cleanup.
+Confirm the requested version matches `TEMPLATE_VERSION` before opening the PR.
+After merge and verification, run from local `main`:
+
+```sh
+python3.12 scripts/tag-release.py --push
+```
+
+The script reads `TEMPLATE_VERSION` from the committed revision and verifies it
+matches GitHub’s default `main`. It creates an annotated tag and pushes only that
+tag. Omit `--push` to create a local tag. An existing remote tag on the same
+commit is a no-op. A conflicting local or remote tag stops the release.
 
 This Git repository at `~/Development/opencode-scaffold` is the editable source
 of truth. The local `newoc` shell entry loads `newoc.zsh` directly from this repo;

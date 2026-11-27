@@ -164,6 +164,14 @@ include credentials, private data or generated artifacts without authorization.
 Use coherent commits; a small change usually needs one commit and one PR, not a
 release/develop branch hierarchy. Useful checkpoints are appropriate for longer work.
 
+Keep a scaffold install or upgrade in its own delivery, separate from product
+changes. If both are already present, preserve the work and inspect staging and
+branch history before proposing a split. Fix managed scaffold files in the
+maintained scaffold repository. If review finds a defect in those files in a
+consumer checkout, record the finding and stop that repair there. Apply the
+upstream fix through `newoc` when authorized. Project-owned instructions and
+configuration overrides still follow the project's own workflow.
+
 1. Run the project's relevant verification and obtain independent Kyle QA.
    When authorized, commit and push the feature branch and open/update a PR to
    the verified default branch. A draft PR may precede final QA/human acceptance.
@@ -203,6 +211,9 @@ failed gates, unresolved findings, missing required human acceptance or genuine
 permissions; do not repeatedly ask for routine steps already authorized.
 Human acceptance must name an affected criterion: for example microphone/device
 behavior, visual quality or a product decision that automated QA cannot establish.
+Surface known manual criteria early so the user can check them while automated
+gates run. Carry forward recorded acceptance when it still covers the same
+behavior and satisfies the project's policy.
 If no affected manual criterion applies and QA/review/required checks pass, existing
 shipping/merge authorization is sufficient; do not ask for a second generic approval.
 A documentation-only change does not automatically require app/device testing.

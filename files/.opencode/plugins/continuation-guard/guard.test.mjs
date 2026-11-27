@@ -110,6 +110,33 @@ for (const type of ['session.execution.interrupted', 'session.execution.failed']
     assert.equal(f.state().phase, 'paused'); assert.equal(f.notices.length, 0);
     await assert.rejects(f.call({ action: 'resume', next_action: 'retry' }), /fresh user/);
   });
+for (const type of ['session.execution.interrupted', 'session.execution.failed']) {
+  test(type + ' supersedes a prompt still resolving session scope', async t => {
+    const f = await fixture(t); await f.start();
+    const getSession = f.context.session.get;
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    f.context.session.get = async () => { await held; return getSession(); };
+    const pending = f.prompt();
+    await f.event(type);
+    release(); await pending;
+    assert.equal(f.state().freshInput, false);
+    await assert.rejects(f.call({ action: 'resume', next_action: 'Stale retry' }), /fresh user/);
+    await f.prompt();
+    await f.call({ action: 'resume', next_action: 'New user request' });
+    await f.delegate();
+  });
+  test(type + ' clears fresh input even if the prompt write is already in flight', async t => {
+    const f = await fixture(t); await f.start(); const held = f.holdNextWrite();
+    const pending = f.prompt(); await held.entered;
+    await f.event(type); held.release(); await pending;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.state().phase, 'paused');
+    assert.equal(f.state().freshInput, false);
+    await assert.rejects(f.delegate(), /register\/resume/);
+    await assert.rejects(f.call({ action: 'resume', next_action: 'Stale retry' }), /fresh user/);
+  });
+}
 test('stall guard reports incomplete once and cannot be self-rearmed', async t => {
   const f = await fixture(t); await f.start();
   for (let i = 0; i < 5; i++) await f.idle();

@@ -160,6 +160,7 @@ export async function install(ctx, now = Date.now) {
     if (!await primary(event.sessionID)) { clear(event.sessionID, version); return; }
     await serial(event.sessionID, async () => {
       const state = await get(event.sessionID);
+      if (epoch(event.sessionID) !== version) return;
       if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
       state.phase = 'paused'; state.freshInput = true;
       state.reason = 'New user input: reconcile the latest instruction before resuming';
@@ -204,9 +205,14 @@ export async function install(ctx, now = Date.now) {
         const version = suspend(id); // Do not queue cancellation behind the idle hook.
         await serial(id, async () => {
           const state = await get(id);
-          if (!state || state.phase !== 'active') { if (!state || state.phase === 'complete') clear(id, version); return; }
-          state.phase = 'paused'; state.freshInput = false;
-          state.reason = 'Native execution interrupted or failed; no automatic restart';
+          if (!state || state.phase === 'complete') { clear(id, version); return; }
+          if (state.phase !== 'active' && !state.freshInput) return;
+          // Revoke a prompt that already persisted while this event waited for the lock.
+          state.freshInput = false;
+          if (state.phase !== 'blocked') {
+            state.phase = 'paused';
+            state.reason = 'Native execution interrupted or failed; no automatic restart';
+          }
           await put(id, state);
         });
       }
