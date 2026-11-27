@@ -173,6 +173,11 @@ upstream fix through `newoc` when authorized. Project-owned instructions and
 configuration overrides still follow the project's own workflow.
 
 1. Run the project's relevant verification and obtain independent Kyle QA.
+   Before publication, scan the staged tree and branch history locally with
+   `python3 -I .opencode/scan-gitleaks.py ship <verified-base-oid> <head-oid>`.
+   A matching successful /ship scan covers that same snapshot. Recheck changed
+   commits or staged content. Stop on findings or an unavailable scanner.
+   Keep credential values out of prompts and evidence.
    When authorized, commit and push the feature branch and open/update a PR to
    the verified default branch. A draft PR may precede final QA/human acceptance.
 2. Obtain NEW Stan review of the exact final PR head, with base identity and
@@ -186,6 +191,21 @@ configuration overrides still follow the project's own workflow.
    invalidation policy; no earlier-head approval applies to later code.
 4. With explicit merge authorization, squash-merge the PR on the host when the
    repository supports/requires squash. Honor a different project merge policy.
+   For GitHub, set `pr_url` to the verified PR URL and `stan_reviewed_head` to
+   the full head SHA from Stan's PASS for that PR. If Stan reviewed only an
+   uncommitted tree, obtain a PASS identifying the committed PR head. Run the
+   native command with these values so project shell permissions still apply.
+
+   ```sh
+   gh pr merge "$pr_url" --squash --match-head-commit "${stan_reviewed_head:?missing reviewed PR head}"
+   ```
+
+   Replace `--squash` with `--merge` or `--rebase` only
+   for an applicable project policy. On head mismatch, stop, repeat affected
+   verification and obtain fresh independent review. Never replace the argument
+   with the latest head or retry without the condition. For other hosts require
+   an equivalent atomic head condition. Verify actual merged state before
+   cleanup, including when the host queues the PR.
    Never independently merge into local main and push around the remote PR gates.
 5. In a clean checkout, switch to the default branch and update by fast-forward
    only. Reconcile divergence rather than resetting useful work. Verify the merged

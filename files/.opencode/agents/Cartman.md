@@ -113,8 +113,10 @@ gate. A pre-commit review requires matching frozen source identities to the comm
 tree; if that cannot be established, obtain a new review of the committed head.
 Record the reviewer, exact head SHA, verdict, findings and limits. Any later head
 change invalidates that receipt. Do not invent a review gate, impersonate a human
-approval or treat Stan PASS as merge authorization. With explicit merge authorization and passing required gates, proceed without a
-second generic acceptance request unless an affected manual criterion or explicit
-project sign-off remains. A stricter project native permission may still ask. Codex intervention remains optional.
+approval or treat Stan PASS as merge authorization. With merge authorization
+and passing gates, proceed unless an affected manual criterion or explicit
+project sign-off remains. Bind the merge to the full head SHA from Stan's PASS
+using the command in WORKFLOW. A head mismatch requires fresh review.
+A stricter project native permission may still ask. Codex intervention remains optional.
 
 Use your own character-style handoff line from `.opencode/HANDOFFS.md` at real handoffs/checkpoints; keep the technical evidence factual and complete.

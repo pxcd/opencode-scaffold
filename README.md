@@ -194,7 +194,9 @@ loading with hand-maintained directory allowlists.
 For this scaffold repository, use one focused branch, a coherent commit and a PR
 to main. Run the generator/update tests, native config discovery and hook tests;
 obtain fresh independent review of the final commit and satisfy the hosted gates.
-After explicit merge authorization, squash-merge remotely, update local `main`,
+After explicit merge authorization, merge the exact head from Stan's PASS using
+`gh pr merge <pr-url> --squash --match-head-commit <reviewed-head-sha>`.
+After GitHub confirms the merge, update local `main`,
 smoke-test disposable project generation/update, then delete the completed branch.
 No project migration is implied.
 The shared SCM policy is in `files/.opencode/WORKFLOW.md`; project-specific
@@ -469,3 +471,28 @@ as project policy. Project-owned PROJECT.md, AGENTS.md, source, and Git state re
 untouched; this does not start training, inference or inspect private datasets.
 The launcher validates the chosen title helper model as local, including a legacy
 probe title override, and otherwise preserves the native title route.
+
+### Pre-push credential scanning
+
+Install the **Gitleaks 8.30.1** CLI on the host PATH used by Git and OpenCode.
+Use the matching release archive and verify its SHA-256 against the official
+release checksums before extraction. Scans run offline with the pinned default
+rules and fully redacted findings. [Gitleaks release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
+
+Run `newoc --enable-secret-scan` once per clone to activate the pre-push hook.
+Git shares that hook across the clone's worktrees. Ordinary scaffold deployment
+and updates leave active hooks alone. The hook is a trusted standalone copy
+from the newoc installation. To upgrade an installed copy, review the difference
+and replace it explicitly. For an existing hook manager (including Git LFS),
+add the reviewed scanner as a pre-push step with the argument `pre-push`.
+Each hook that reads Git's ref updates must receive its own copy of the original
+stdin. Keep the existing manager, its arguments and its exit status.
+
+A matching /ship plugin scans branch history and the confirmed staged tree
+before model handoff. The hook checks every non-deletion ref update, including
+intermediate commits. A new ref or an unavailable old tip gets a full ancestry
+scan. Findings, incomplete history and scanner errors block the operation.
+Reports identify locations and rules. Fix the affected outgoing commits before
+retrying. The gate scans Git file patches. Commit/tag messages, external LFS
+payloads and opaque binaries need separate coverage. Local hooks can be
+bypassed, so repository-side push protection remains useful.
