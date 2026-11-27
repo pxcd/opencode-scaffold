@@ -213,6 +213,13 @@ manifest and role checks. Project gates and independent source review still appl
 Say **“Release the scaffold as vX.Y.Z”** to authorize the PR, required review and
 checks, squash merge, publication of that version tag, and completed-branch cleanup.
 Confirm the requested version matches `TEMPLATE_VERSION` before opening the PR.
+The `/ship` plugin also supports this source checkout. Open the repository root
+on a feature branch. The root `opencode.json` loads native release roles using the
+prompts in `files/.opencode/agents/`; the machine still supplies provider access.
+The source checkout uses its own CI and `.github/REVIEW.md`. The confirmation
+includes a release tag only when the proposed `TEMPLATE_VERSION` differs from
+the cached default branch. The plugin never deploys a scaffold into this repo.
+
 After merge and verification, run from local `main`:
 
 ```sh

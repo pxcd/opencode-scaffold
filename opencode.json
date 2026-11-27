@@ -1,0 +1,136 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "files/.opencode/BASELINE.md",
+    "files/.opencode/WORKFLOW.md",
+    "files/.opencode/HANDOFFS.md",
+    ".github/REVIEW.md"
+  ],
+  "experimental": {
+    "subagent_depth": 1
+  },
+  "default_agent": "Cartman",
+  "model": "openai/gpt-6.2-sol#medium",
+  "permissions": [
+    {"action": "subagent", "resource": "*", "effect": "deny"},
+    {"action": "external_directory", "resource": "*", "effect": "ask"},
+    {"action": "shell", "resource": "git push*", "effect": "deny"},
+    {"action": "shell", "resource": "git reset*", "effect": "deny"},
+    {"action": "shell", "resource": "git clean*", "effect": "deny"},
+    {"action": "shell", "resource": "osascript *", "effect": "deny"},
+    {"action": "shell", "resource": "open *", "effect": "deny"}
+  ],
+  "agents": {
+    "Cartman": {
+      "description": "Cloud coordinator: routes all implementation to Butters and independent QA to Kyle and code review to Stan",
+      "mode": "primary",
+      "system": "This is the upstream scaffold source checkout. Template instructions below refer to paths under files/ when describing the template. The installed-project continuation and QA retry tools are not loaded here. Use native task tracking and repo-local evidence in their place. Run source CI and the exact-head review gate in .github/REVIEW.md. Use the staged-scaffold verifier only when verifying a deployed downstream scaffold.\n\n{file:files/.opencode/agents/Cartman.md}",
+      "model": "openai/gpt-6.2-sol#medium",
+      "steps": 80,
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "ask"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "Butters", "effect": "allow"},
+        {"action": "subagent", "resource": "Kyle", "effect": "allow"},
+        {"action": "subagent", "resource": "Stan", "effect": "allow"},
+        {"action": "subagent", "resource": "Chef", "effect": "allow"},
+        {"action": "shell", "resource": "git push*", "effect": "ask"},
+        {"action": "shell", "resource": "git push*--force*", "effect": "deny"},
+        {"action": "shell", "resource": "git push -f*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* -f*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* -uf*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* -qf*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* -vf*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* +*", "effect": "deny"},
+        {"action": "shell", "resource": "git push*--mirror*", "effect": "deny"},
+        {"action": "shell", "resource": "git push*--delete*", "effect": "deny"},
+        {"action": "shell", "resource": "git push -d*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* -d*", "effect": "deny"},
+        {"action": "shell", "resource": "git push* :*", "effect": "deny"}
+      ]
+    },
+    "Butters": {
+      "description": "Local implementation and bounded repairs",
+      "mode": "subagent",
+      "system": "{file:files/.opencode/agents/Butters.md}",
+      "model": "lmstudio/qwen/qwen3.8-27b",
+      "steps": 32,
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+        {"action": "execute", "resource": "*", "effect": "deny"},
+        {"action": "edit", "resource": "opencode.json", "effect": "deny"},
+        {"action": "edit", "resource": "*/opencode.json", "effect": "deny"},
+        {"action": "edit", "resource": ".opencode/*", "effect": "deny"},
+        {"action": "edit", "resource": "*/.config/opencode/*", "effect": "deny"},
+        {"action": "edit", "resource": "opencode.jsonc", "effect": "deny"},
+        {"action": "edit", "resource": "*/opencode.jsonc", "effect": "deny"},
+        {"action": "edit", "resource": "*/.opencode/*", "effect": "deny"},
+        {"action": "edit", "resource": ".opencode/evidence/*", "effect": "allow"},
+        {"action": "edit", "resource": "*/.opencode/evidence/*", "effect": "allow"}
+      ]
+    },
+    "Kyle": {
+      "description": "Fresh independent local source review and executed checks",
+      "mode": "subagent",
+      "system": "{file:files/.opencode/agents/Kyle.md}",
+      "model": "lmstudio/qwen/qwen3.8-27b",
+      "steps": 40,
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "deny"},
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+        {"action": "execute", "resource": "*", "effect": "deny"},
+        {"action": "edit", "resource": ".opencode/evidence/*", "effect": "allow"},
+        {"action": "edit", "resource": "*/.opencode/evidence/*", "effect": "allow"}
+      ]
+    },
+    "Stan": {
+      "description": "Fresh independent cloud code review of the final revision",
+      "mode": "subagent",
+      "system": "{file:files/.opencode/agents/Stan.md}",
+      "model": "openai/gpt-6.2-sol#medium",
+      "steps": 40,
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "deny"},
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+        {"action": "execute", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"}
+      ]
+    },
+    "Chef": {
+      "description": "On-demand read-only planning advice for difficult design decisions and stalled repairs",
+      "mode": "subagent",
+      "system": "{file:files/.opencode/agents/Chef.md}",
+      "model": "openai/gpt-6.2-astra#high",
+      "steps": 20,
+      "permissions": [
+        {"action": "*", "resource": "*", "effect": "deny"},
+        {"action": "read", "resource": "*", "effect": "allow"},
+        {"action": "glob", "resource": "*", "effect": "allow"},
+        {"action": "grep", "resource": "*", "effect": "allow"},
+        {"action": "read", "resource": ".env*", "effect": "deny"},
+        {"action": "read", "resource": "*/.env*", "effect": "deny"}
+      ]
+    },
+    "compaction": {
+      "model": "lmstudio/qwen3.8-27b-compaction",
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "deny"}
+      ]
+    },
+    "title": {
+      "model": "lmstudio/qwen/qwen3.8-27b",
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "deny"}
+      ]
+    },
+    "summary": {
+      "model": "lmstudio/qwen/qwen3.8-27b",
+      "permissions": [
+        {"action": "external_directory", "resource": "*", "effect": "deny"}
+      ]
+    }
+  }
+}
