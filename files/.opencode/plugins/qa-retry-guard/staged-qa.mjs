@@ -68,6 +68,12 @@ function canonical(input, root) {
     && (input.workdir === undefined || input.workdir === '.' || input.workdir === root);
 }
 
+function repeatsVerifier(command) {
+  return typeof command === 'string' && (command.includes(COMMAND)
+    || (command.includes(PINNED_PREFIX) && command.includes(GATE_SUFFIX))
+    || /\bpython3(?:\.12)?\s+(?:-I\s+)?(?:\.\/)?\.opencode\/verify-scaffold\.py\s+--qa\b/.test(command));
+}
+
 // A user prompt, synthetic wake and compaction summary all become model-facing
 // user messages. Stamp real prompt admission so only a new assignment resets QA.
 const FIELD = 'scaffoldQAAssignment';
@@ -77,6 +83,14 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
   const root = ctx.location.directory;
   const shipping = new Set();
   const guarded = new Map();
+  const matchesReceipt = async state => Boolean(state.verifiedIndex
+    && (await snapshot(root))?.identity === state.verifiedIndex);
+  const requireFreshGate = async (id, state) => {
+    const pending = { assignment: state.assignment, phase: 'pending' };
+    guarded.set(id, pending);
+    await ctx.storage.set(key(id), pending);
+    return pending;
+  };
   await ctx.session.hook('prompt', event => {
     const ship = shipsScaffold(event, root);
     event.metadata = { ...event.metadata, [FIELD]: ship ? 'ship' : marked(event.prompt.text, VERDICT) ? 'verdict'
@@ -98,8 +112,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
         await ctx.storage.set(key(id), state);
       } else if (task.metadata[FIELD] === (primary ? 'ship' : 'gate')) {
         const verified = !primary && state?.verifiedIndex;
-        const current = verified ? await snapshot(root) : undefined;
-        state = verified && current?.identity === verified
+        state = verified
           ? { assignment: task.id, phase: 'finished', verifiedIndex: verified }
           : { assignment: task.id, phase: primary ? 'ship' : 'pending' };
         await ctx.storage.set(key(id), state);
@@ -115,9 +128,15 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     }
 
     if (!state) { guarded.delete(id); return; }
+    // A synthetic wake or reload can resume the same prompt ID. A finished
+    // phase from an older build, or for a different index, grants no reuse.
+    if (state.phase === 'finished' && !await matchesReceipt(state)) {
+      state = await requireFreshGate(id, state);
+    }
     guarded.set(id, state);
+    if (state.phase === 'failed') return;
     if (state.phase === 'finished') {
-      if (state.verifiedIndex) request.system.push({ type: 'text', text:
+      request.system.push({ type: 'text', text:
         'This Kyle session already has a verified staged QA receipt. Use it for the same snapshot. '
         + 'Run only any remaining checks and return the independent verdict.' });
       return;
@@ -127,8 +146,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
       if (!pending || (name !== 'shell' && !READS.has(name))) delete request.tools[name];
     }
     if (state.phase === 'verdict') {
-      const identity = await snapshot(root);
-      const reusable = Boolean(state.verifiedIndex && identity?.identity === state.verifiedIndex);
+      const reusable = await matchesReceipt(state);
       const instruction = reusable
         ? 'Give your independent QA verdict as plain text now. Start with PASS, FAIL, or BLOCKED. Use your recorded verifier exit 0 and your existing source inspection. Name concrete findings or missing evidence. If evidence is incomplete, return BLOCKED and name the exact gap. No tools are available. Do not emit tool-call markup.'
         : 'Return BLOCKED in plain text. There is no verified passing gate for the current staged snapshot. Tell Cartman to start staged QA on the current snapshot.';
@@ -159,11 +177,17 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     }
     const state = guarded.get(event.sessionID);
     if (event.agent !== 'Kyle' || !state) return;
+    if (state.phase === 'failed') return;
     if (state.phase === 'finished') {
-      const command = event.input?.command;
-      if (state.verifiedIndex && event.tool === 'shell'
-          && (command === COMMAND || (typeof command === 'string' && command.startsWith(PINNED_PREFIX)
-              && command.endsWith(GATE_SUFFIX)))) {
+      const reusable = await matchesReceipt(state);
+      if (guarded.get(event.sessionID) !== state) {
+        throw new Error('The staged QA assignment changed. Use the current gate instructions.');
+      }
+      if (!reusable) {
+        await requireFreshGate(event.sessionID, state);
+        throw new Error('The staged QA receipt is stale or missing. Run the canonical gate on the current snapshot.');
+      }
+      if (event.tool === 'shell' && repeatsVerifier(event.input?.command)) {
         throw new Error('This assignment already earned a passing staged QA receipt. Reuse it on the same snapshot; '
           + 'start fresh staged QA if the snapshot changed.');
       }
@@ -194,12 +218,13 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     if (!state || event.agent !== 'Kyle' || event.tool !== 'shell' || state.call !== event.id) return;
     const output = event.result?.output;
     const finished = event.status === 'completed' && Number.isInteger(output?.exitCode) && !output.shellID && !output.signal;
-    const updated = { assignment: state.assignment, phase: finished ? 'finished' : 'blocked' };
+    const updated = { assignment: state.assignment, phase: finished ? 'failed' : 'blocked' };
     if (finished && output.exitCode === 0 && state.before) {
       const after = await snapshot(root);
       if (after?.identity === state.before.identity
           && typeof output.output === 'string'
           && output.output.split(/\r?\n/).includes(state.before.receipt)) {
+        updated.phase = 'finished';
         updated.verifiedIndex = state.before.identity;
       } else {
         updated.phase = 'blocked';

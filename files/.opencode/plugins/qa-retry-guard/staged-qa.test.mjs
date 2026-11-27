@@ -159,7 +159,11 @@ test('same-snapshot ordinary resume keeps other checks available without rerunni
   assert.match(request.system.at(-1).text, /already has a verified/);
   assert.equal((await h.before('Kyle', 'shell', { command: 'git diff --cached --check' })).command,
     'git diff --cached --check');
-  for (const duplicate of [command, pinned]) {
+  for (const duplicate of [
+    command, pinned, 'python3.12 .opencode/verify-scaffold.py --qa',
+    'mkdir -p .opencode/evidence/task && if ' + command + ' > .opencode/evidence/task/gate.log; then echo ok; fi',
+    pinned + ' > .opencode/evidence/task/gate.log',
+  ]) {
     await assert.rejects(h.before('Kyle', 'shell', { command: duplicate }), /already earned/);
   }
 
@@ -167,4 +171,47 @@ test('same-snapshot ordinary resume keeps other checks available without rerunni
   const next = await h.prompt('changed', marker);
   assert.deepEqual((await h.context('Kyle', [next])).shell.input.properties.command.enum, [command]);
   assert.equal((await h.before('Kyle', 'shell', { command })).command, pinned);
+});
+
+test('same-assignment resume requires a fresh gate when the index changes', async () => {
+  const data = new Map();
+  let identity = 'tree-a';
+  const h = await host(data, async () => staged(identity));
+  const handoff = await h.prompt('qa', marker);
+  await h.context('Kyle', [handoff]);
+  await h.before('Kyle', 'shell', { command });
+  await h.after('completed', { exitCode: 0, output: receipt });
+
+  identity = 'tree-b';
+  const resumed = await host(data, async () => staged(identity));
+  // The same persisted prompt is still present after a reload or synthetic wake.
+  const request = await resumed.request('Kyle', [handoff]);
+  assert.deepEqual(request.tools.shell.input.properties.command.enum, [command]);
+  assert.equal(data.get('staged-qa:Kyle').verifiedIndex, undefined);
+  assert.doesNotMatch(request.system.at(-1).text, /already has a verified/);
+  await assert.rejects(resumed.before('Kyle', 'shell', { command: 'git diff --cached --check' }), /before other executable checks/);
+  assert.equal((await resumed.before('Kyle', 'shell', { command })).command, pinned);
+});
+
+test('legacy finished receipt is rejected on same-assignment resume', async () => {
+  const data = new Map([['staged-qa:Kyle', { assignment: 'qa', phase: 'finished', verifiedPinned: 'tree-a' }]]);
+  const h = await host(data);
+  const handoff = await h.prompt('qa', marker);
+  const request = await h.request('Kyle', [handoff]);
+  assert.deepEqual(request.tools.shell.input.properties.command.enum, [command]);
+  assert.deepEqual(data.get('staged-qa:Kyle'), { assignment: 'qa', phase: 'pending' });
+  await assert.rejects(h.before('Kyle', 'shell', { command: 'git diff --cached --check' }), /before other executable checks/);
+});
+
+test('snapshot changes after tool discovery revoke reuse before the remaining tool executes', async () => {
+  const data = new Map([['staged-qa:Kyle', { assignment: 'qa', phase: 'finished', verifiedIndex: 'tree-a' }]]);
+  let identity = 'tree-a';
+  const h = await host(data, async () => staged(identity));
+  const handoff = await h.prompt('qa', marker);
+  const ready = await h.request('Kyle', [handoff]);
+  assert.match(ready.system.at(-1).text, /already has a verified/);
+
+  identity = undefined;
+  await assert.rejects(h.before('Kyle', 'shell', { command: 'git diff --cached --check' }), /receipt is stale or missing/);
+  assert.deepEqual(data.get('staged-qa:Kyle'), { assignment: 'qa', phase: 'pending' });
 });

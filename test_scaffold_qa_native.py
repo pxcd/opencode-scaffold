@@ -211,7 +211,8 @@ class ScaffoldQANativeTests(unittest.TestCase):
                 return tool_delta('shell', {'command': commands[index],
                                              'workdir': str(project)}, f'call_child_{index}')
             if child and index in (6, 7):
-                command = GATE if index == 6 else RESUME_CHECK
+                command = ('if ' + GATE + ' > .opencode/evidence/fixture-repeat.log; then echo ok; fi'
+                           if index == 6 else RESUME_CHECK)
                 return tool_delta('shell', {'command': command, 'workdir': str(project)}, f'call_child_{index}')
             if child:
                 result = VERDICT if 'Give your independent QA verdict' in str(request['messages'][-1]) else 'Fixture checkpoint.'
@@ -354,6 +355,7 @@ class ScaffoldQANativeTests(unittest.TestCase):
         self.assertNotIn('enum', advertised[6]['shell']['properties']['command'])
         self.assertEqual(advertised[9], {})
         self.assertIn('already earned a passing', replies['call_child_6'])
+        self.assertFalse((project / '.opencode/evidence/fixture-repeat.log').exists())
         self.assertIn('QA_RESUME_CHECK_EXECUTED', replies['call_child_7'])
         self.assertIn('Stop paging past the end', str(child_requests[5]['messages']))
         self.assertIn('Give your independent QA verdict', str(child_requests[9]['messages'][-1]))
