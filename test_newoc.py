@@ -39,6 +39,31 @@ class ScaffoldTests(unittest.TestCase):
 
     def run_tool(self, *args, cwd=None):
         return subprocess.run(['python3.12',str(SCRIPT),*args],cwd=cwd,text=True,capture_output=True)
+
+    def test_pr_template_whitespace_repair_only_updates_the_exact_starter(self):
+        relative = Path('.github/PULL_REQUEST_TEMPLATE.md')
+        fixed = (HERE / 'files' / relative).read_bytes()
+        for name, original, expected in [
+            ('generated', fixed + b'\n', fixed),
+            ('custom', fixed + b'\nProject-specific acceptance\n\n', fixed + b'\nProject-specific acceptance\n\n'),
+            ('missing', None, None),
+        ]:
+            with self.subTest(name=name):
+                self.assertEqual(self.run_tool(name, '--root', str(self.root)).returncode, 0)
+                project = self.root / name
+                path = project / relative
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_bytes(original)
+                preview = self.run_tool('--update', cwd=project)
+                self.assertEqual(preview.returncode, 0, preview.stderr)
+                self.assertEqual(str(relative) in preview.stderr, name == 'generated')
+                self.assertEqual(path.read_bytes() if path.exists() else None, original)
+                applied = self.run_tool('--update', '--apply', cwd=project)
+                self.assertEqual(applied.returncode, 0, applied.stderr)
+                self.assertEqual(path.read_bytes() if path.exists() else None, expected)
+                self.assertNotIn(str(relative), self.run_tool('--update', cwd=project).stderr)
     def git(self, path, *args):
         return subprocess.check_output(['git','-C',str(path),*args],text=True).strip()
     def legacy_fixture(self, name='legacy'):

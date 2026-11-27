@@ -29,3 +29,12 @@ export function normalizeStepLimit(messages) {
 export function unsupportedPrefill(error) {
   return /does not support assistant response prefill\/continuation/i.test(error?.message ?? '');
 }
+
+// OpenCode's empty StructWithRest lists no fixed fields. LM Studio still
+// requires a properties object on each OpenAI-compatible function schema.
+export function normalizeBrowserTabsList(tools) {
+  const tool = tools?.browser_tabs_list;
+  if (tool?.input?.type === 'object' && !Object.hasOwn(tool.input, 'properties')) {
+    tool.input = { ...tool.input, properties: {} };
+  }
+}

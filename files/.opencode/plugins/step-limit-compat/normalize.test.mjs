@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeStepLimit, STEP_LIMIT_PROMPT, unsupportedPrefill } from './normalize.mjs';
+import plugin from './index.js';
 
 test('only synthetic trailing assistant budget instruction changes role', () => {
   const first={role:'user',content:[{type:'text',text:'task'}]};
@@ -25,4 +26,22 @@ test('only deterministic unsupported-prefill failure bypasses retry',()=>{
  assert.equal(unsupportedPrefill({message:'Splash does not support assistant response prefill/continuation.'}),true);
  assert.equal(unsupportedPrefill({message:'network timeout'}),false);
  assert.equal(unsupportedPrefill({message:'rate limited'}),false);
+});
+
+test('LM Studio context adds empty properties only to the affected browser tool', async () => {
+  let handler;
+  await plugin.setup({ session: { hook(name, callback, options) {
+    if (name !== 'context') return;
+    assert.deepEqual(options, { providerID: 'lmstudio' });
+    handler = callback;
+  } } });
+  const input = Object.freeze({ type: 'object', propertyNames: { type: 'string' } });
+  const tools = { browser_tabs_list: { input }, unrelated: { input } };
+  handler({ messages: [], tools });
+  assert.deepEqual(tools.browser_tabs_list.input, { ...input, properties: {} });
+  assert.equal(tools.unrelated.input, input);
+  const normalized = tools.browser_tabs_list.input;
+  handler({ messages: [], tools });
+  assert.equal(tools.browser_tabs_list.input, normalized);
+  handler({ messages: [] });
 });

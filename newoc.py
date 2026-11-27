@@ -18,6 +18,8 @@ MANIFEST = Path('.opencode/scaffold.json')
 LAYOUT = 'native-layers-v1'
 OVERRIDES = Path('.opencode/opencode.json')
 INSTRUCTIONS = Path('AGENTS.md')
+PR_TEMPLATE = Path('.github/PULL_REQUEST_TEMPLATE.md')
+PR_TEMPLATE_WITH_BLANK_EOF = 'db5bb39aab316acebc66948f69480ced5982f51368d37dc4c8a71db70d726fc2'
 STARTER_HISTORY = TEMPLATE.parent / 'starter-history'
 
 # The same checker is shipped into projects for dispatch-time validation.
@@ -34,6 +36,17 @@ def managed(relative):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def pr_template_correction(target):
+    path = target / PR_TEMPLATE
+    # This template is project-owned. Repair only the exact generated file.
+    if path.parent.is_symlink() or path.is_symlink() or not path.is_file():
+        return None
+    data = path.read_bytes()
+    if digest(data) == PR_TEMPLATE_WITH_BLANK_EOF:
+        return data[:-1]
+    return None
 
 
 def atomic_write(path, data, mode=None):
@@ -282,6 +295,9 @@ def update(target, apply=False):
     instruction_change, starter, backup, instruction_status = instruction_update(target, old)
     if instruction_change is not None:
         changes.append(instruction_change)
+    pr_template = pr_template_correction(target)
+    if pr_template is not None:
+        changes.append((target / PR_TEMPLATE, pr_template))
     ignore_path = target / '.gitignore'
     safe_update_destination(target, ignore_path)
     ignore = ignore_path.read_bytes() if ignore_path.exists() else b''
@@ -321,6 +337,9 @@ def legacy_update(target, apply=False, ownership=None):
     if not instruction_path.exists():
         writes[INSTRUCTIONS] = (TEMPLATE / INSTRUCTIONS).read_text().replace('{{PROJECT_NAME}}', target.name).encode()
         starter = {'sha256': digest(writes[INSTRUCTIONS]), 'project_name': target.name}
+    pr_template = pr_template_correction(target)
+    if pr_template is not None:
+        writes[PR_TEMPLATE] = pr_template
     ignore_path = target / '.gitignore'
     safe_update_destination(target, ignore_path)
     ignore = ignore_path.read_bytes() if ignore_path.exists() else b''

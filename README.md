@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.6
+# Native Sol Cartman + local OpenCode scaffold 4.3.7
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -240,6 +240,9 @@ are excluded from automatic updates and must not also appear in managed `files`.
 Keep their rules/models/hooks under project review. Finder `.DS_Store` metadata
 is excluded from generation and updates; legacy metadata ownership is retired
 without deleting the existing file.
+
+The 4.3.7 update removes the trailing blank line from exact copies of the old
+generated PR template. Customized or missing templates are preserved.
 
 ### Plug-and-play instructions (4.1.0)
 
