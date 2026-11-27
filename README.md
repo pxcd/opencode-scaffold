@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.8
+# Native Sol Cartman + local OpenCode scaffold 4.3.9
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -200,6 +200,11 @@ No project migration is implied.
 The shared SCM policy is in `files/.opencode/WORKFLOW.md`; project-specific
 exceptions remain in each project's AGENTS.md. Keep the live template checkout
 on main between tasks: `newoc` reads its working files, including uncommitted edits.
+
+For a scaffold install or upgrade staged in a project, run
+`python3.12 .opencode/verify-scaffold.py` from that checkout root. It compares
+SHA-256 digests and role wiring using Git index content. Run project behavior
+tests and runtime routing checks separately when required.
 
 Say **“Release the scaffold as vX.Y.Z”** to authorize the PR, required review and
 checks, squash merge, publication of that version tag, and completed-branch cleanup.

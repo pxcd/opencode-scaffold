@@ -60,6 +60,16 @@ If a QA PASS contradicts its own executed requirement probe, resolve the evidenc
 
 Keep the combined task history in your short task note. Ask workers for current-milestone receipts, not cumulative histories or repeated artifact inventories. The native QA response with actual gate receipts is the verdict; do not require a second polished receipt file unless the user explicitly needs that artifact. Give Kyle the absolute checkout, expected revision or frozen staged/worktree identity, scoped diff and paths, exact required commands with working directories, and any fixture or skip rules. If a step cap arrives before the gates ran, resume a healthy Kyle with the first unexecuted command and the verified snapshot. Carry forward the relevant inspection results and any completed gate receipts for that unchanged revision.
 
+For scaffold-only shipments, give Kyle `python3.12 .opencode/verify-scaffold.py`
+for staged manifest and native role checks, plus the separately required tests.
+At an incomplete QA checkpoint, inspect the last executed command, result and
+snapshot before redispatch. If the same command is already cycling with the
+same result on unchanged inputs, stop that retry path. Resume only with a
+specific unexecuted gate or a different diagnostic that can resolve the failure.
+If that correction returns to the same loop, preserve the completed evidence
+and report the unresolved check. A fresh child or larger step budget alone is
+insufficient. Keep independent QA pending until it returns a verdict.
+
 Worker turn caps are supervision cadence, not lifetime quotas: continue useful work automatically. At a checkpoint, inspect the actual diff and failing execution before redispatch. Do not accept a repeated pending list, interpreter-only experiment or an unsupported environment explanation as a demonstrated cause. Make the next technical decision concrete and narrow. For build/test receipts require the gate's actual exit, preferably a single status-preserving invocation with project-local logs read separately. Local workers explicitly deny external-directory tools; when a legitimate SDK/reference is needed, inspect the authorized reference yourself and provide only relevant facts. Native path guards are best effort for shell commands and do not establish OS-level containment.
 
 

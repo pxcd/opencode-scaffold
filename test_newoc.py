@@ -40,6 +40,52 @@ class ScaffoldTests(unittest.TestCase):
     def run_tool(self, *args, cwd=None):
         return subprocess.run(['python3.12',str(SCRIPT),*args],cwd=cwd,text=True,capture_output=True)
 
+    def test_scaffold_verification_uses_staged_hashes_and_role_config(self):
+        result = self.run_tool('verify-index', '--root', str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        project = self.root / 'verify-index'
+        config_path = project / 'opencode.json'
+        manifest_path = project / '.opencode/scaffold.json'
+        overrides_path = project / '.opencode/opencode.json'
+        script = project / '.opencode/verify-scaffold.py'
+
+        def stage(*paths):
+            subprocess.run(['git', 'add', '--', *paths], cwd=project, check=True)
+
+        def verify():
+            return subprocess.run(['python3.12', str(script)], cwd=project, capture_output=True, text=True)
+
+        def verify_failure(expected):
+            result = verify()
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+
+        stage('.opencode', 'opencode.json')
+        original = config_path.read_bytes()
+        config = json.loads(original)
+        config['agents']['build']['steps'] += 1
+        config_path.write_text(json.dumps(config))
+        result = verify()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('staged manifest SHA-256 digests', result.stdout)
+        stage('opencode.json')
+        verify_failure("Manifest SHA-256 mismatch in Git index: 'opencode.json'")
+
+        manifest = json.loads(manifest_path.read_bytes())
+        manifest['files']['opencode.json'] = hashlib.sha256(config_path.read_bytes()).hexdigest()
+        manifest_path.write_text(json.dumps(manifest))
+        stage('.opencode/scaffold.json')
+        verify_failure('build and Cartman must share coordinator policy')
+
+        config_path.write_bytes(original)
+        manifest['files']['opencode.json'] = hashlib.sha256(original).hexdigest()
+        manifest_path.write_text(json.dumps(manifest))
+        overrides_path.write_text(json.dumps({'agents': {'build': {'permissions': [
+            {'action': 'shell', 'resource': 'git push*', 'effect': 'deny'},
+        ]}}}))
+        stage('opencode.json', '.opencode/scaffold.json', '.opencode/opencode.json')
+        verify_failure('project permissions must match across Cartman and build')
+
     def test_pr_template_whitespace_repair_only_updates_the_exact_starter(self):
         relative = Path('.github/PULL_REQUEST_TEMPLATE.md')
         fixed = (HERE / 'files' / relative).read_bytes()
