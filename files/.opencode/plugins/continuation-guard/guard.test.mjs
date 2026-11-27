@@ -127,6 +127,26 @@ test('explicit cancellation preserves the old checkpoint and a later task can st
   assert.equal(archived.milestones[0].evidence, 'Repair checked');
   assert.equal(archived.milestones[1].done, false);
 });
+for (const type of ['session.execution.interrupted', 'session.execution.failed']) {
+  test(type + ' cannot drop an explicit cancellation during session lookup', async t => {
+    const f = await fixture(t); await f.start();
+    const getSession = f.context.session.get;
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    f.context.session.get = async () => { await held; return getSession(); };
+    const cancellation = f.prompt('Cancel this task.');
+    await f.event(type);
+    release();
+    await cancellation;
+    await f.idle();
+    assert.equal(f.state().phase, 'cancelled');
+    assert.equal(f.state().freshInput, false);
+    assert.equal(f.notices.length, 0);
+    await f.prompt('Start another approved task.');
+    await f.start();
+    assert.equal(f.existing.get('continuation:s1:last-cancelled').phase, 'cancelled');
+  });
+}
 for (const type of ['session.execution.interrupted', 'session.execution.failed'])
   test(type + ' never restarts on a later idle notice', async t => {
     const f = await fixture(t); await f.start(); await f.event(type); await f.idle();

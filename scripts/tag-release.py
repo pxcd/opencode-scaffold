@@ -54,7 +54,9 @@ def release(version, commit, push):
         if (git('cat-file', '-t', local_object) != 'tag'
                 or git('rev-parse', '--verify', f'{local_object}^{{commit}}') != commit):
             raise ValueError(f'Local {tag} is not an annotated tag for the authorized commit.')
-        git('push', '--no-follow-tags', 'origin', f'{local_object}:{ref}')
+        # A bare hexadecimal source can match a same-named ref before Git
+        # tries object resolution. Peel syntax cannot be a ref name.
+        git('push', '--no-follow-tags', 'origin', f'{local_object}^{{tag}}:{ref}')
         print(f'Published {tag} at {commit}.')
     else:
         print(f'Local tag {tag} points to {commit}.')

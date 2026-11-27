@@ -97,6 +97,18 @@ class TagReleaseTests(unittest.TestCase):
         self.assertIn('authorized version', result.stderr)
         self.assertEqual(self.git('tag', '--list'), '')
 
+    def test_object_named_branch_cannot_redirect_the_release_tag(self):
+        self.assertEqual(self.tag().returncode, 0)
+        tag_object = self.git('rev-parse', 'refs/tags/v4.3.8')
+        tree = self.git('rev-parse', 'HEAD^{tree}')
+        other = self.git('commit-tree', tree, '-m', 'Alternate fixture object')
+        self.git('branch', tag_object, other)
+        result = self.tag('--push')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.git('ls-remote', '--tags', 'origin', 'refs/tags/v4.3.8').split()[0], tag_object)
+        self.assertEqual(self.git('ls-remote', '--tags', 'origin', 'refs/tags/v4.3.8^{}').split()[0],
+                         self.merge_commit)
+
 
 if __name__ == '__main__':
     unittest.main()

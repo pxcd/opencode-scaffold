@@ -165,19 +165,23 @@ export async function install(ctx, now = Date.now) {
   }));
   registrations.push(await ctx.session.hook('prompt', async event => {
     const version = suspend(event.sessionID); // Fence BEFORE awaiting the session lock.
+    // Queue explicit user cancellation before resolving scope so a native
+    // interruption cannot discard it while the session lookup is pending.
+    if (/^cancel this task\.?$/i.test(event.prompt?.text?.trim() ?? '')) {
+      return serial(event.sessionID, async () => {
+        if (!await primary(event.sessionID)) { clear(event.sessionID, version); return; }
+        const state = await get(event.sessionID);
+        if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
+        state.phase = 'cancelled'; state.freshInput = false;
+        state.reason = 'User explicitly cancelled the task';
+        await put(event.sessionID, state);
+      });
+    }
     if (!await primary(event.sessionID)) { clear(event.sessionID, version); return; }
     await serial(event.sessionID, async () => {
       const state = await get(event.sessionID);
       if (epoch(event.sessionID) !== version) return;
       if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
-      // Recognize only the explicit user prompt. Native interruptions, status
-      // questions and worker output do not authorize replacing a plan.
-      if (/^cancel this task\.?$/i.test(event.prompt?.text?.trim() ?? '')) {
-        state.phase = 'cancelled'; state.freshInput = false;
-        state.reason = 'User explicitly cancelled the task';
-        await put(event.sessionID, state);
-        return;
-      }
       if (state.phase === 'cancelled') {
         state.freshInput = true;
         await put(event.sessionID, state);
