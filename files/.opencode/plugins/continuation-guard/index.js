@@ -80,7 +80,9 @@ export async function install(ctx, now = Date.now) {
       const state = old && structuredClone(old);
       if (input.action === 'status') return { content: JSON.stringify(state ?? { phase: 'unarmed' }) };
       if (input.action === 'start') {
-        if (old && old.phase !== 'complete')
+        if (old?.phase === 'cancelled' && !old.freshInput)
+          throw new Error('A cancelled plan needs a new user request before starting other work');
+        if (old && !['complete', 'cancelled'].includes(old.phase))
           throw new Error('Preserve the existing plan; reconcile or rebind unfinished work before continuing');
         const goal = text(input.goal, 'goal', 1000);
         if (!Array.isArray(input.milestones) || !input.milestones.length || input.milestones.length > 32)
@@ -91,9 +93,14 @@ export async function install(ctx, now = Date.now) {
         const nextAction = text(input.next_action, 'next_action');
         const fresh = { version: 1, root, goal, milestones, nextAction, phase: 'active',
           revision: 0, lastRevision: -1, resumes: 0, stalls: 0, started: now(), freshInput: false };
+        if (old?.phase === 'cancelled') {
+          await ctx.storage.set(key(id) + ':last-cancelled', old);
+          if (epoch(id) !== version) throw new Error('New input or interruption superseded this checkpoint action');
+        }
         await put(id, fresh); clear(id, version); return { content: JSON.stringify(fresh) };
       }
       if (!state) throw new Error('Register the task first');
+      if (state.phase === 'cancelled') throw new Error('The cancelled plan cannot resume');
       if (state.root !== root && input.action !== 'rebind')
         throw new Error('Checkpoint belongs to another checkout; rebind only after an authorized native move');
       if (input.action === 'rebind') {
@@ -163,6 +170,19 @@ export async function install(ctx, now = Date.now) {
       const state = await get(event.sessionID);
       if (epoch(event.sessionID) !== version) return;
       if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
+      // Recognize only the explicit user prompt. Native interruptions, status
+      // questions and worker output do not authorize replacing a plan.
+      if (/^cancel this task\.?$/i.test(event.prompt?.text?.trim() ?? '')) {
+        state.phase = 'cancelled'; state.freshInput = false;
+        state.reason = 'User explicitly cancelled the task';
+        await put(event.sessionID, state);
+        return;
+      }
+      if (state.phase === 'cancelled') {
+        state.freshInput = true;
+        await put(event.sessionID, state);
+        return;
+      }
       state.phase = 'paused'; state.freshInput = true;
       state.reason = 'New user input: reconcile the latest instruction before resuming';
       await put(event.sessionID, state);
@@ -210,7 +230,7 @@ export async function install(ctx, now = Date.now) {
           if (state.phase !== 'active' && !state.freshInput) return;
           // Revoke a prompt that already persisted while this event waited for the lock.
           state.freshInput = false;
-          if (state.phase !== 'blocked') {
+          if (!['blocked', 'cancelled'].includes(state.phase)) {
             state.phase = 'paused';
             state.reason = 'Native execution interrupted or failed; no automatic restart';
           }

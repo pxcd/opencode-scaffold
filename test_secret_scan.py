@@ -77,6 +77,18 @@ class CredentialGateTests(unittest.TestCase):
                          "refs/heads/base")
         self.git("push", "origin", ":refs/heads/base")
 
+    def test_plaintext_scan_is_independent_of_host_attributes(self):
+        xdg = self.root / "config"
+        (xdg / "git").mkdir(parents=True)
+        (xdg / "git/attributes").write_text("settings.py -diff\n")
+        env = {**self.env, "XDG_CONFIG_HOME": str(xdg)}
+        self.assertIn("diff: unset", self.git("check-attr", "diff", "--", "settings.py", env=env).stdout)
+        self.commit("settings.py", f'API_TOKEN="{TOKEN}"\n')
+        result = self.git("push", "origin", "HEAD:refs/heads/base", env=env, ok=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('"settings.py":1 (github-pat)', result.stderr)
+        self.assertNotIn(TOKEN, result.stderr + result.stdout)
+
     def test_merge_only_findings_are_detected(self):
         self.git("switch", "-qc", "side")
         self.commit("side.txt", "side\n")

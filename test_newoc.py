@@ -116,13 +116,25 @@ class ScaffoldTests(unittest.TestCase):
                     self.assertIn(f'disables or changes required role {role}', result.stderr)
                     self.assertNotIn('PASS: staged scaffold QA', result.stdout)
 
+        overrides_path.write_text(json.dumps({'agents': {'Kyle': {'permissions': [
+            {'action': 'external_directory', 'resource': '*', 'effect': 'allow'},
+        ]}}}))
+        stage('.opencode/opencode.json')
+        overrides_path.write_text('{}')
+        result = subprocess.run(['python3.12', str(script), '--qa'], cwd=project,
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('unrestricted external access to Kyle', result.stderr)
+
         overrides_path.write_text(json.dumps({'agents': {'Cartman': {'steps': 51}, 'Butters': {
             'model': 'lmstudio/custom',
-        }}}))
+        }, 'Kyle': {'permissions': [{'action': 'shell', 'resource': '*', 'effect': 'deny'}]}}}))
         stage('.opencode/opencode.json')
-        result = verify()
+        result = subprocess.run(['python3.12', str(script), '--qa'], cwd=project,
+                                capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('Valid project step limits: Cartman=51, build=', result.stdout)
+        self.assertIn('PASS: staged scaffold QA', result.stdout)
 
     def test_scaffold_qa_runs_managed_staged_suites_and_reports_real_failures(self):
         result = self.run_tool('qa-index', '--root', str(self.root))

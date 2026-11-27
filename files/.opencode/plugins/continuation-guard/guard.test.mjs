@@ -42,7 +42,7 @@ async function fixture(t, existing = new Map(), directory = root) {
     start: () => call({ action: 'start', goal: 'Finish authorized change',
       milestones: [{ id: 'repair', title: 'Repair' }, { id: 'qa', title: 'Fresh QA' }], next_action: 'Repair, then execute fresh QA' }),
     idle: background => hooks.get('experimental.idle')({ sessionID: 's1', background: background ?? [] }),
-    prompt: () => hooks.get('prompt')({ sessionID: 's1' }),
+    prompt: text => hooks.get('prompt')({ sessionID: 's1', prompt: { text } }),
     delegate: () => hooks.get('execute.before')({ sessionID: 's1', agent: 'Cartman', tool: 'subagent' }),
     setSession: s => { session = s; }, setClock: n => { clock = n; },
     event: async type => { queue.push({ type, data: { sessionID: 's1' } }); wake?.(); await new Promise(r => setImmediate(r)); },
@@ -103,6 +103,29 @@ test('a new user continuation can resume the preserved plan', async t => {
   const f = await fixture(t); await f.start(); await f.prompt();
   await f.call({ action: 'resume', next_action: 'Continue approved QA' }); await f.idle();
   assert.equal(f.notices.length, 1); assert.equal(f.state().milestones.length, 2);
+});
+test('explicit cancellation preserves the old checkpoint and a later task can start', async t => {
+  const f = await fixture(t); await f.start();
+  await f.call({ action: 'progress', completed: ['repair'], evidence: 'Repair checked', next_action: 'Fresh QA' });
+  await f.prompt('Is this ready?');
+  await assert.rejects(f.start(), /Preserve/);
+  await f.prompt('Cancel this task.');
+  assert.equal(f.state().phase, 'cancelled');
+  await f.idle();
+  assert.equal(f.notices.length, 0);
+  await assert.rejects(f.delegate(), /register/);
+  await assert.rejects(f.start(), /new user/);
+  await assert.rejects(f.call({ action: 'resume', next_action: 'Old work' }), /cancelled/i);
+  await f.event('session.execution.interrupted');
+  await f.prompt('Begin the unrelated approved task.');
+  await f.call({ action: 'start', goal: 'Unrelated approved task',
+    milestones: [{ id: 'new', title: 'New check' }], next_action: 'Run new check' });
+  await f.delegate();
+  assert.equal(f.state().goal, 'Unrelated approved task');
+  const archived = f.existing.get('continuation:s1:last-cancelled');
+  assert.equal(archived.phase, 'cancelled');
+  assert.equal(archived.milestones[0].evidence, 'Repair checked');
+  assert.equal(archived.milestones[1].done, false);
 });
 for (const type of ['session.execution.interrupted', 'session.execution.failed'])
   test(type + ' never restarts on a later idle notice', async t => {

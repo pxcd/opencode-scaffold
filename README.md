@@ -216,13 +216,15 @@ Confirm the requested version matches `TEMPLATE_VERSION` before opening the PR.
 After merge and verification, run from local `main`:
 
 ```sh
-python3.12 scripts/tag-release.py --push
+python3.12 scripts/tag-release.py --version X.Y.Z --merge-commit MERGE_SHA --push
 ```
 
-The script reads `TEMPLATE_VERSION` from the committed revision and verifies it
-matches GitHub’s default `main`. It creates an annotated tag and pushes only that
-tag. Omit `--push` to create a local tag. An existing remote tag on the same
-commit is a no-op. A conflicting local or remote tag stops the release.
+Use the authorized release version and the full squash-merge SHA returned by
+GitHub. The script requires the committed `TEMPLATE_VERSION` to match the
+requested version and both local and remote default `main` to match the merge
+SHA. It creates an annotated tag and publishes that validated Git object.
+Omit `--push` to create a local tag. An existing remote tag on the same commit
+is a no-op. A conflicting local or remote tag stops the release.
 
 This Git repository at `~/Development/opencode-scaffold` is the editable source
 of truth. The local `newoc` shell entry loads `newoc.zsh` directly from this repo;

@@ -28,13 +28,15 @@ class TagReleaseTests(unittest.TestCase):
         self.git('add', 'TEMPLATE_VERSION')
         self.git('commit', '-qm', 'Merged fixture')
         self.git('push', 'origin', 'main')
+        self.merge_commit = self.git('rev-parse', 'HEAD')
 
     def git(self, *args):
         return subprocess.check_output(['git', '-C', str(self.repo), *args], text=True,
                                        stderr=subprocess.PIPE).strip()
 
-    def tag(self, *args):
-        return subprocess.run(['python3.12', str(self.script), *args], cwd=self.repo,
+    def tag(self, *args, version='4.3.8', commit=None):
+        return subprocess.run(['python3.12', str(self.script), '--version', version,
+                               '--merge-commit', commit or self.merge_commit, *args], cwd=self.repo,
                               capture_output=True, text=True)
 
     def test_local_tag_uses_the_committed_version_and_push_publishes_only_it(self):
@@ -59,7 +61,7 @@ class TagReleaseTests(unittest.TestCase):
 
     def test_unmerged_local_head_is_refused(self):
         self.git('commit', '--allow-empty', '-qm', 'Local only')
-        result = self.tag('--push')
+        result = self.tag('--push', commit=self.git('rev-parse', 'HEAD'))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('must match', result.stderr)
         self.assertEqual(self.git('tag', '--list', 'v4.3.8'), '')
@@ -69,15 +71,31 @@ class TagReleaseTests(unittest.TestCase):
         original = self.git('rev-parse', 'v4.3.8')
         self.git('commit', '--allow-empty', '-qm', 'New remote main')
         self.git('push', 'origin', 'main')
-        result = self.tag('--push')
+        result = self.tag('--push', commit=self.git('rev-parse', 'HEAD'))
         self.assertIn('Local v4.3.8 already points elsewhere', result.stderr)
         self.assertEqual(self.git('rev-parse', 'v4.3.8'), original)
         self.git('push', 'origin', 'refs/tags/v4.3.8')
         self.git('tag', '-d', 'v4.3.8')
-        result = self.tag('--push')
+        result = self.tag('--push', commit=self.git('rev-parse', 'HEAD'))
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Origin v4.3.8 already points elsewhere', result.stderr)
         self.assertEqual(self.git('ls-remote', '--tags', 'origin', 'refs/tags/v4.3.8').split()[0], original)
+
+    def test_local_and_remote_main_advance_after_the_authorized_merge(self):
+        (self.repo / 'TEMPLATE_VERSION').write_text('4.3.9\n')
+        self.git('commit', '-qam', 'Later release')
+        self.git('push', 'origin', 'main')
+        result = self.tag('--push')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('authorized merge commit', result.stderr)
+        self.assertEqual(self.git('tag', '--list'), '')
+        self.assertEqual(self.git('ls-remote', '--tags', 'origin'), '')
+
+    def test_wrong_version_cannot_tag_the_authorized_merge(self):
+        result = self.tag('--push', version='4.3.9')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('authorized version', result.stderr)
+        self.assertEqual(self.git('tag', '--list'), '')
 
 
 if __name__ == '__main__':

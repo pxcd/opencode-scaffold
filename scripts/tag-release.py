@@ -12,17 +12,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def git(*args, check=True):
     return subprocess.run(
-        ['git', '-C', str(ROOT), *args], check=check, capture_output=True, text=True,
+        ['git', '--no-replace-objects', '-C', str(ROOT), *args], check=check, capture_output=True, text=True,
     ).stdout.strip()
 
 
-def release(push):
+def release(version, commit, push):
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
+        raise ValueError('The authorized version must be major.minor.patch.')
+    if not re.fullmatch(r'(?:[0-9a-f]{40}|[0-9a-f]{64})', commit):
+        raise ValueError('The authorized merge commit must be a full Git object ID.')
     if git('symbolic-ref', '--quiet', '--short', 'HEAD', check=False) != 'main':
         raise ValueError('Switch to local main after the scaffold PR is merged.')
-    commit = git('rev-parse', 'HEAD')
-    version = git('show', f'{commit}:TEMPLATE_VERSION')
-    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
-        raise ValueError('The merged TEMPLATE_VERSION must be major.minor.patch.')
+    if git('rev-parse', 'HEAD') != commit:
+        raise ValueError('Local main must match the authorized merge commit.')
+    if git('show', f'{commit}:TEMPLATE_VERSION') != version:
+        raise ValueError('TEMPLATE_VERSION does not match the authorized version.')
     tag = f'v{version}'
     ref = f'refs/tags/{tag}'
 
@@ -34,7 +38,7 @@ def release(push):
         raise ValueError('Local main must match the merged commit on origin’s default main branch.')
 
     local_object = git('rev-parse', '--verify', '--quiet', ref, check=False)
-    if local_object and git('rev-parse', '--verify', f'{ref}^{{commit}}', check=False) != commit:
+    if local_object and git('rev-parse', '--verify', f'{local_object}^{{commit}}', check=False) != commit:
         raise ValueError(f'Local {tag} already points elsewhere. No refs changed.')
     remote_target = remote.get(f'{ref}^{{}}', remote.get(ref))
     if remote_target:
@@ -45,8 +49,12 @@ def release(push):
 
     if not local_object:
         git('tag', '-a', tag, commit, '-m', f'OpenCode scaffold {version}')
+        local_object = git('rev-parse', '--verify', ref)
     if push:
-        git('push', '--no-follow-tags', 'origin', f'{ref}:{ref}')
+        if (git('cat-file', '-t', local_object) != 'tag'
+                or git('rev-parse', '--verify', f'{local_object}^{{commit}}') != commit):
+            raise ValueError(f'Local {tag} is not an annotated tag for the authorized commit.')
+        git('push', '--no-follow-tags', 'origin', f'{local_object}:{ref}')
         print(f'Published {tag} at {commit}.')
     else:
         print(f'Local tag {tag} points to {commit}.')
@@ -54,13 +62,15 @@ def release(push):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--version', required=True, help='Authorized TEMPLATE_VERSION, without v')
+    parser.add_argument('--merge-commit', required=True, help='Exact squash-merge commit returned by GitHub')
     parser.add_argument('--push', action='store_true', help='Publish only this tag to origin')
     args = parser.parse_args()
     try:
-        release(args.push)
+        release(args.version, args.merge_commit, args.push)
     except (ValueError, subprocess.CalledProcessError) as error:
         if isinstance(error, subprocess.CalledProcessError):
-            parser.exit(1, f'tag-release: git {error.cmd[3]} failed (exit {error.returncode}).\n')
+            parser.exit(1, f'tag-release: git {error.cmd[4]} failed (exit {error.returncode}).\n')
         parser.exit(1, f'tag-release: {error}\n')
 
 

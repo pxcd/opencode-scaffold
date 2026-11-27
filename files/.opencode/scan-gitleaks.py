@@ -69,12 +69,14 @@ def scan(updates, tree=None):
     with tempfile.TemporaryDirectory(prefix="ship-gitleaks-") as temp:
         root = Path(temp)
         env = {k: v for k, v in os.environ.items() if not k.startswith(("GIT_", "GITLEAKS_"))}
-        env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
+        env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull, GIT_ATTR_NOSYSTEM="1",
                    GIT_NO_REPLACE_OBJECTS="1", GIT_TERMINAL_PROMPT="0", GIT_NO_LAZY_FETCH="1",
                    GIT_AUTHOR_NAME="Scan", GIT_COMMITTER_NAME="Scan",
                    GIT_AUTHOR_EMAIL="scan@example.invalid", GIT_COMMITTER_EMAIL="scan@example.invalid")
         db = root / "objects.git"
         git("init", "-q", "--bare", "--template=", f"--object-format={fmt}", str(db), cwd=root, env=env)
+        # Git loads the default XDG attributes even with global config disabled.
+        git("config", "--local", "core.attributesFile", os.devnull, cwd=db, env=env)
         if "\n" in objects:
             raise Blocked("Unsupported object directory name.")
         (db / "objects/info/alternates").write_bytes(os.fsencode(objects) + b"\n")

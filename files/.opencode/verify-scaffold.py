@@ -183,8 +183,7 @@ def verify(qa=False):
     module = {'__file__': str(helper.resolve()), '__name__': 'scaffold_preflight'}
     exec(compile(managed[PREFLIGHT], PREFLIGHT, 'exec'), module)
     validate = module['validate_coordinator_overrides']
-    project_agents = validate(config, overrides)
-    module['validate_required_subagents'](config, project_agents)
+    project_agents = module['validate_project_policy'](Path.cwd(), config, overrides, index.keys())
 
     prefix = 'Verified' if qa else 'PASS:'
     print(f'{prefix} {len(managed)} staged manifest SHA-256 digests and shared native role wiring')

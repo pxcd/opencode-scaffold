@@ -33,6 +33,11 @@ preserved plan when the existing authorization still applies. Native
 interruption/failure suspends the checkpoint. There is no restart
 from failure, permission prompts, server restart, or an explicit user stop.
 
+To cancel an unfinished plan in the current session, send `Cancel this task.`
+as a standalone message. The guard preserves the cancelled checkpoint and
+rejects resuming it. A later user request can register a new plan in the same
+session. The most recent cancelled checkpoint remains in native plugin storage.
+
 Automatic recovery is bounded to twelve nudges per activation, three consecutive
 nudges without milestone progress, and a 24-hour window. Exhaustion reports an
 incomplete checkpoint, not success; rearming needs fresh user input. These are

@@ -6,6 +6,7 @@ from pathlib import Path
 
 OVERRIDES = Path('.opencode/opencode.json')
 COORDINATORS = ('Cartman', 'build')
+NON_ORCHESTRATION_DIRECTORIES = {'evidence', 'node_modules', '__pycache__', '.git'}
 
 
 def validate_coordinator_overrides(defaults, overrides):
@@ -68,6 +69,22 @@ def validate_overrides(target, defaults, overrides=None):
         raise ValueError('Refusing symlink project overrides')
     if overrides is None:
         overrides = json.loads(path.read_text()) if path.exists() else {}
+    protected = set()
+    # Inspect names, not contents. Include shipped and existing custom orchestration;
+    # never walk investigation logs or dependency/vendor trees for this check.
+    for folder in (Path(__file__).resolve().parent, target / '.opencode'):
+        for parent, directories, files in os.walk(folder, followlinks=False):
+            directories[:] = [d for d in directories if d not in NON_ORCHESTRATION_DIRECTORIES]
+            for name in files:
+                relative = (Path(parent) / name).relative_to(folder)
+                if relative != Path('PROJECT.md'):
+                    protected.add(str(Path('.opencode') / relative))
+    validate_project_policy(target, defaults, overrides, protected)
+    return overrides
+
+
+def validate_project_policy(target, defaults, overrides, protected_paths):
+    """Check supplied settings without loading project configuration from disk."""
     agents = validate_coordinator_overrides(defaults, overrides)
     validate_required_subagents(defaults, agents)
     global_rules = overrides.get('permissions', [])
@@ -76,15 +93,11 @@ def validate_overrides(target, defaults, overrides=None):
             or r['effect'] not in ('deny', 'allow', 'ask') for r in global_rules):
         raise ValueError('Project permissions must be a list of action/resource/effect rules')
     protected = {'opencode.json', 'opencode.jsonc', '.opencode/opencode.json', '.opencode/opencode.jsonc'}
-    # Inspect names, not contents. Include shipped and existing custom orchestration;
-    # never walk investigation logs or dependency/vendor trees for this check.
-    for folder in (Path(__file__).resolve().parent, target / '.opencode'):
-        for parent, directories, files in os.walk(folder, followlinks=False):
-            directories[:] = [d for d in directories if d not in ('evidence', 'node_modules', '__pycache__', '.git')]
-            for name in files:
-                relative = (Path(parent) / name).relative_to(folder)
-                if relative != Path('PROJECT.md'):
-                    protected.add(str(Path('.opencode') / relative))
+    for path in protected_paths:
+        if (path.startswith('.opencode/') and path != '.opencode/PROJECT.md'
+                and NON_ORCHESTRATION_DIRECTORIES.isdisjoint(Path(path).parts[1:-1])):
+            protected.add(path)
+    root = target.resolve()
     for role, shared in defaults['agents'].items():
         custom = agents.get(role, {})
         if not isinstance(custom, dict):
@@ -132,7 +145,7 @@ def validate_overrides(target, defaults, overrides=None):
                 raise ValueError(f'Project override grants unrestricted external access to {role}; use explicitly authorized scoped paths')
         if role in ('Butters', 'Kyle'):
             for path in sorted(protected):
-                for resource in (path, str(target.resolve() / path)):
+                for resource in (path, str(root / path)):
                     if decision('edit', resource) == 'allow':
                         raise ValueError(f'Project override permits {role} to edit orchestration: {path}')
         if role in COORDINATORS:
@@ -146,4 +159,4 @@ def validate_overrides(target, defaults, overrides=None):
             for action in ('edit', 'shell', 'execute', 'subagent', 'external_directory'):
                 if decision(action, '*') != 'deny':
                     raise ValueError(f'Project override weakens Stan {action} denial')
-    return overrides
+    return agents
