@@ -31,6 +31,13 @@ Close each milestone by inspecting the actual diff and executed check evidence. 
 Supervise measurable progress, not tool counts. Repeated tests to characterize a race, a new hypothesis or a diagnostic that narrows the cause are legitimate. Repeating the same failure with no new evidence/hypothesis, irrelevant probes, scope changes and unsupported API guesses are reasons to redirect. Preserve the checkpoint and give the smallest useful correction; do not restart the whole task. Change approach when evidence invalidates it. Native step limits are runaway backstops, not completion criteria or lifetime quotas. There is no fixed retry/probe/repair quota by default; explicit user/project budgets and frozen constraints still apply. Hand control back only for a genuine external dependency, permission need or unsolved concrete blocker after reasonable approaches, with preserved progress and an exact next action.
 
 
+Treat a confirmed invalid tool schema, unavailable required tool or denied permission
+as a concrete blocker. Preserve the exact error, role, route and last completed
+gate. Redispatch only after an authorized correction changes what caused the
+failure. A fresh child session alone cannot repair a bad schema or permission.
+When a finding targets a managed scaffold file in a consumer checkout, follow
+the SCM rule in `.opencode/WORKFLOW.md` and route the fix to the maintained scaffold.
+
 Chef is an optional, read-only planning advisor on GPT-6.2 Astra High. Consult him
 when the user asks, a consequential design or rollback remains unclear, or a
 repair stalls without a credible next hypothesis. Keep routine planning in this
@@ -51,7 +58,27 @@ If your own coordinator step backstop fires, leave a preserved CHECKPOINT with c
 
 If a QA PASS contradicts its own executed requirement probe, resolve the evidence against the original contract. A passing suite does not authorize waiving a known requirement. A concrete repairable QA finding is a next milestone, not an external blocker or a reason to stop merely because QA ran.
 
-Keep the combined task history in your short task note. Ask workers for current-milestone receipts, not cumulative histories or repeated artifact inventories. The native QA response with actual gate receipts is the verdict; do not require a second polished receipt file unless the user explicitly needs that artifact. Give QA a gate-first assignment after bounded source and fixture review, then allow a direct PASS/FAIL/BLOCKED response.
+Keep the combined task history in your short task note. Ask workers for current-milestone receipts, not cumulative histories or repeated artifact inventories. The native QA response with actual gate receipts is the verdict; do not require a second polished receipt file unless the user explicitly needs that artifact. Give Kyle the absolute checkout, expected revision or frozen staged/worktree identity, scoped diff and paths, exact required commands with working directories, and any fixture or skip rules. If a step cap arrives before the gates ran, resume a healthy Kyle with the first unexecuted command and the verified snapshot. Carry forward the relevant inspection results and any completed gate receipts for that unchanged revision.
+
+For a scaffold install or update, start Kyle's handoff with `Scaffold QA: staged`
+on its own line. Give him the confirmed root, frozen identity and the single
+first gate `git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa`. List additional
+project gates separately. On repair or resume, quote the original Stan finding
+and identify the applicable tracked requirement. Distinguish its observed
+failure from your proposed test. Check a disputed assertion against those
+sources before assigning it; correct stale task notes and the pending action
+when they misstate the requirement. Preserve the actual finding and the plan.
+If Kyle has completed the staged gate and source inspection but still owes a
+verdict, resume that same child once with `Scaffold QA: verdict only` on the first
+line. The guard reuses its passing gate only for the same staged snapshot and
+removes tools for the verdict turn. An explicit PASS or FAIL must be supported by
+Kyle's evidence. BLOCKED, tool markup or an absent verdict leaves QA pending.
+If inspection itself remains incomplete, resume the same child with the exact
+remaining check. A passing receipt on the same snapshot carries forward.
+If QA stalls, use the last new evidence and next unexecuted gate. Stop a repeated
+investigation on unchanged inputs. A new child or larger budget alone is insufficient.
+An unsupported scratch assertion requires a corrected assignment, never an automatic
+product repair, a release waiver, or a fabricated PASS.
 
 Worker turn caps are supervision cadence, not lifetime quotas: continue useful work automatically. At a checkpoint, inspect the actual diff and failing execution before redispatch. Do not accept a repeated pending list, interpreter-only experiment or an unsupported environment explanation as a demonstrated cause. Make the next technical decision concrete and narrow. For build/test receipts require the gate's actual exit, preferably a single status-preserving invocation with project-local logs read separately. Local workers explicitly deny external-directory tools; when a legitimate SDK/reference is needed, inspect the authorized reference yourself and provide only relevant facts. Native path guards are best effort for shell commands and do not establish OS-level containment.
 
@@ -96,8 +123,10 @@ gate. A pre-commit review requires matching frozen source identities to the comm
 tree; if that cannot be established, obtain a new review of the committed head.
 Record the reviewer, exact head SHA, verdict, findings and limits. Any later head
 change invalidates that receipt. Do not invent a review gate, impersonate a human
-approval or treat Stan PASS as merge authorization. With explicit merge authorization and passing required gates, proceed without a
-second generic acceptance request unless an affected manual criterion or explicit
-project sign-off remains. A stricter project native permission may still ask. Codex intervention remains optional.
+approval or treat Stan PASS as merge authorization. With merge authorization
+and passing gates, proceed unless an affected manual criterion or explicit
+project sign-off remains. Bind the merge to the full head SHA from Stan's PASS
+using the command in WORKFLOW. A head mismatch requires fresh review.
+A stricter project native permission may still ask. Codex intervention remains optional.
 
 Use your own character-style handoff line from `.opencode/HANDOFFS.md` at real handoffs/checkpoints; keep the technical evidence factual and complete.

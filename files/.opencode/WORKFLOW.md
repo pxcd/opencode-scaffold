@@ -164,7 +164,36 @@ include credentials, private data or generated artifacts without authorization.
 Use coherent commits; a small change usually needs one commit and one PR, not a
 release/develop branch hierarchy. Useful checkpoints are appropriate for longer work.
 
+Keep a scaffold install or upgrade in its own delivery, separate from product
+changes. If both are already present, preserve the work and inspect staging and
+branch history before proposing a split. Fix managed scaffold files in the
+maintained scaffold repository. If review finds a defect in those files in a
+consumer checkout, record the finding and stop that repair there. Apply the
+upstream fix through `newoc` when authorized. Project-owned instructions and
+configuration overrides still follow the project's own workflow.
+
+For a scaffold installation or upgrade, start the native Kyle handoff with
+`Scaffold QA: staged` on its own line. After confirming the checkout and frozen
+scope, Kyle's first executable gate is `git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa`.
+Its receipt covers the staged manifest, coordinator wiring and override regressions,
+and the managed plugin suites. Run the project's other applicable gates as well.
+The managed Cartman and Desktop build defaults match. Project step limits may
+differ; each must be a positive integer. Coordinator permission overrides must match.
+
+When verifying a repair, give Kyle the original reviewer's precise finding
+and revision, with the relevant user or tracked project requirement. Keep the
+observable defect separate from a proposed remedy. A scratch probe or previous
+handoff may supply evidence but cannot establish a new requirement. If its
+assertion conflicts with the written contract, correct the QA assignment and
+resume the pending gates on the same snapshot. Preserve any independently
+supported defect and seek a decision only for a genuine unresolved policy conflict.
+
 1. Run the project's relevant verification and obtain independent Kyle QA.
+   Before publication, scan the staged tree and branch history locally with
+   `python3 -I .opencode/scan-gitleaks.py ship <verified-base-oid> <head-oid>`.
+   A matching successful /ship scan covers that same snapshot. Recheck changed
+   commits or staged content. Stop on findings or an unavailable scanner.
+   Keep credential values out of prompts and evidence.
    When authorized, commit and push the feature branch and open/update a PR to
    the verified default branch. A draft PR may precede final QA/human acceptance.
 2. Obtain NEW Stan review of the exact final PR head, with base identity and
@@ -178,6 +207,21 @@ release/develop branch hierarchy. Useful checkpoints are appropriate for longer 
    invalidation policy; no earlier-head approval applies to later code.
 4. With explicit merge authorization, squash-merge the PR on the host when the
    repository supports/requires squash. Honor a different project merge policy.
+   For GitHub, set `pr_url` to the verified PR URL and `stan_reviewed_head` to
+   the full head SHA from Stan's PASS for that PR. If Stan reviewed only an
+   uncommitted tree, obtain a PASS identifying the committed PR head. Run the
+   native command with these values so project shell permissions still apply.
+
+   ```sh
+   gh pr merge "$pr_url" --squash --match-head-commit "${stan_reviewed_head:?missing reviewed PR head}"
+   ```
+
+   Replace `--squash` with `--merge` or `--rebase` only
+   for an applicable project policy. On head mismatch, stop, repeat affected
+   verification and obtain fresh independent review. Never replace the argument
+   with the latest head or retry without the condition. For other hosts require
+   an equivalent atomic head condition. Verify actual merged state before
+   cleanup, including when the host queues the PR.
    Never independently merge into local main and push around the remote PR gates.
 5. In a clean checkout, switch to the default branch and update by fast-forward
    only. Reconcile divergence rather than resetting useful work. Verify the merged
@@ -203,6 +247,9 @@ failed gates, unresolved findings, missing required human acceptance or genuine
 permissions; do not repeatedly ask for routine steps already authorized.
 Human acceptance must name an affected criterion: for example microphone/device
 behavior, visual quality or a product decision that automated QA cannot establish.
+Surface known manual criteria early so the user can check them while automated
+gates run. Carry forward recorded acceptance when it still covers the same
+behavior and satisfies the project's policy.
 If no affected manual criterion applies and QA/review/required checks pass, existing
 shipping/merge authorization is sufficient; do not ask for a second generic approval.
 A documentation-only change does not automatically require app/device testing.

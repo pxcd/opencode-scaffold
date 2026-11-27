@@ -42,7 +42,7 @@ async function fixture(t, existing = new Map(), directory = root) {
     start: () => call({ action: 'start', goal: 'Finish authorized change',
       milestones: [{ id: 'repair', title: 'Repair' }, { id: 'qa', title: 'Fresh QA' }], next_action: 'Repair, then execute fresh QA' }),
     idle: background => hooks.get('experimental.idle')({ sessionID: 's1', background: background ?? [] }),
-    prompt: () => hooks.get('prompt')({ sessionID: 's1' }),
+    prompt: text => hooks.get('prompt')({ sessionID: 's1', prompt: { text } }),
     delegate: () => hooks.get('execute.before')({ sessionID: 's1', agent: 'Cartman', tool: 'subagent' }),
     setSession: s => { session = s; }, setClock: n => { clock = n; },
     event: async type => { queue.push({ type, data: { sessionID: 's1' } }); wake?.(); await new Promise(r => setImmediate(r)); },
@@ -104,18 +104,88 @@ test('a new user continuation can resume the preserved plan', async t => {
   await f.call({ action: 'resume', next_action: 'Continue approved QA' }); await f.idle();
   assert.equal(f.notices.length, 1); assert.equal(f.state().milestones.length, 2);
 });
+test('explicit cancellation preserves the old checkpoint and a later task can start', async t => {
+  const f = await fixture(t); await f.start();
+  await f.call({ action: 'progress', completed: ['repair'], evidence: 'Repair checked', next_action: 'Fresh QA' });
+  await f.prompt('Is this ready?');
+  await assert.rejects(f.start(), /Preserve/);
+  await f.prompt('Cancel this task.');
+  assert.equal(f.state().phase, 'cancelled');
+  await f.idle();
+  assert.equal(f.notices.length, 0);
+  await assert.rejects(f.delegate(), /register/);
+  await assert.rejects(f.start(), /new user/);
+  await assert.rejects(f.call({ action: 'resume', next_action: 'Old work' }), /cancelled/i);
+  await f.event('session.execution.interrupted');
+  await f.prompt('Begin the unrelated approved task.');
+  await f.call({ action: 'start', goal: 'Unrelated approved task',
+    milestones: [{ id: 'new', title: 'New check' }], next_action: 'Run new check' });
+  await f.delegate();
+  assert.equal(f.state().goal, 'Unrelated approved task');
+  const archived = f.existing.get('continuation:s1:last-cancelled');
+  assert.equal(archived.phase, 'cancelled');
+  assert.equal(archived.milestones[0].evidence, 'Repair checked');
+  assert.equal(archived.milestones[1].done, false);
+});
+for (const type of ['session.execution.interrupted', 'session.execution.failed']) {
+  test(type + ' cannot drop an explicit cancellation during session lookup', async t => {
+    const f = await fixture(t); await f.start();
+    const getSession = f.context.session.get;
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    f.context.session.get = async () => { await held; return getSession(); };
+    const cancellation = f.prompt('Cancel this task.');
+    await f.event(type);
+    release();
+    await cancellation;
+    await f.idle();
+    assert.equal(f.state().phase, 'cancelled');
+    assert.equal(f.state().freshInput, false);
+    assert.equal(f.notices.length, 0);
+    await f.prompt('Start another approved task.');
+    await f.start();
+    assert.equal(f.existing.get('continuation:s1:last-cancelled').phase, 'cancelled');
+  });
+}
 for (const type of ['session.execution.interrupted', 'session.execution.failed'])
   test(type + ' never restarts on a later idle notice', async t => {
     const f = await fixture(t); await f.start(); await f.event(type); await f.idle();
     assert.equal(f.state().phase, 'paused'); assert.equal(f.notices.length, 0);
     await assert.rejects(f.call({ action: 'resume', next_action: 'retry' }), /fresh user/);
   });
+for (const type of ['session.execution.interrupted', 'session.execution.failed']) {
+  test(type + ' supersedes a prompt still resolving session scope', async t => {
+    const f = await fixture(t); await f.start();
+    const getSession = f.context.session.get;
+    let release;
+    const held = new Promise(resolve => { release = resolve; });
+    f.context.session.get = async () => { await held; return getSession(); };
+    const pending = f.prompt();
+    await f.event(type);
+    release(); await pending;
+    assert.equal(f.state().freshInput, false);
+    await assert.rejects(f.call({ action: 'resume', next_action: 'Stale retry' }), /fresh user/);
+    await f.prompt();
+    await f.call({ action: 'resume', next_action: 'New user request' });
+    await f.delegate();
+  });
+  test(type + ' clears fresh input even if the prompt write is already in flight', async t => {
+    const f = await fixture(t); await f.start(); const held = f.holdNextWrite();
+    const pending = f.prompt(); await held.entered;
+    await f.event(type); held.release(); await pending;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.state().phase, 'paused');
+    assert.equal(f.state().freshInput, false);
+    await assert.rejects(f.delegate(), /register\/resume/);
+    await assert.rejects(f.call({ action: 'resume', next_action: 'Stale retry' }), /fresh user/);
+  });
+}
 test('stall guard reports incomplete once and cannot be self-rearmed', async t => {
   const f = await fixture(t); await f.start();
   for (let i = 0; i < 5; i++) await f.idle();
   assert.equal(f.state().phase, 'blocked'); assert.equal(f.notices.length, 4);
   assert.match(f.notices.at(-1).text, /No milestone progress/);
-  await assert.rejects(f.start(), /fresh user/);
+  await assert.rejects(f.start(), /Preserve the existing plan/);
 });
 test('changing next-action prose does not count as milestone progress', async t => {
   const f = await fixture(t); await f.start();
@@ -157,6 +227,18 @@ test('malformed plans cannot arm a loop or erase pending scope', async t => {
   await assert.rejects(f.call({ action: 'progress', completed: ['unknown'], evidence: 'x', next_action: 'x' }), /Unknown/);
 });
 
+test('new user input cannot replace an unfinished plan or its receipts', async t => {
+  const f = await fixture(t); await f.start();
+  await f.call({ action: 'progress', completed: ['repair'], evidence: 'Repair verified', next_action: 'QA' });
+  await f.idle();
+  await f.prompt();
+  const paused = structuredClone(f.state());
+  await assert.rejects(f.start(), /Preserve the existing plan/);
+  assert.deepEqual(f.state(), paused);
+  await f.call({ action: 'resume', next_action: 'Finish QA' });
+  assert.deepEqual(f.state().milestones, paused.milestones);
+});
+
 test('authorized native checkout move can retain the full plan without resetting budgets', async t => {
   const shared = new Map(); const first = await fixture(t, shared); await first.start(); await first.idle();
   const second = await fixture(t, shared, root + '/..');
@@ -166,6 +248,26 @@ test('authorized native checkout move can retain the full plan without resetting
   assert.equal(second.state().milestones.length, 2); assert.equal(second.state().resumes, 1);
   await second.delegate(); await second.idle(); assert.equal(second.notices.length, 1);
   await first.idle(); assert.equal(first.notices.length, 1); // Old-root hook cannot resume it.
+});
+
+test('a prompt before rebinding preserves the paused checkpoint and its budget', async t => {
+  const shared = new Map(); const first = await fixture(t, shared); await first.start();
+  await first.call({ action: 'progress', completed: ['repair'], evidence: 'Repair verified', next_action: 'QA' });
+  await first.idle(); await first.idle();
+  const second = await fixture(t, shared, root + '/..');
+  await second.prompt();
+  const paused = structuredClone(second.state());
+  await assert.rejects(second.call({ action: 'resume', next_action: 'QA' }), /another checkout/);
+  await assert.rejects(second.start(), /Preserve the existing plan/);
+  await second.call({ action: 'rebind', reason: 'Authorized native checkout move', next_action: 'QA' });
+  for (const field of ['phase', 'freshInput', 'milestones', 'resumes', 'stalls', 'started']) {
+    assert.deepEqual(second.state()[field], paused[field]);
+  }
+  await assert.rejects(second.delegate(), /register\/resume/);
+  await second.idle();
+  assert.equal(second.notices.length, 0);
+  await second.call({ action: 'resume', next_action: 'QA' });
+  await second.delegate();
 });
 
 for (const type of ['session.execution.interrupted', 'session.execution.failed'])

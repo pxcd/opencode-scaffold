@@ -6,8 +6,8 @@ Give the next executable action. Ordinary conversation needs no checkpoint.
 The tool does not grant permission to run a task or create a goal by itself.
 
 After actual milestones finish, record their evidence and the next action. Reopen
-milestones when source changes invalidate their results. Never replace an active
-plan with a smaller task to hide unfinished scope. A worker's checkpoint is not
+milestones when source changes invalidate their results. Keep unfinished plans
+when new input arrives and reconcile their pending scope. A worker's checkpoint is not
 a batch completion; dispatch the next permitted step instead of merely saying it
 is ready. Complete only when every registered milestone has current evidence.
 Evidence strings are coordinator claims, not machine verification of QA quality.
@@ -22,7 +22,8 @@ jobs wake the parent normally; abandoned descendant work is reported as blocked.
 The guard persists bounded state in native plugin storage, scoped to session/root.
 After a separately authorized native checkout move, use `rebind` to retain the
 existing plan and budgets in the new root; if storage is location-scoped, register
-the still-pending scope there. Rebinding grants no directory access or move authority.
+the still-pending scope there. If the plan is paused, it stays paused after
+rebinding. Rebinding grants no directory access or move authority.
 
 A real blocker must name its cause and next action. New user input suspends
 continuation until the coordinator explicitly reconciles it: resume only if work
@@ -31,6 +32,11 @@ continue. A status question does not cancel the task: answer it and resume the
 preserved plan when the existing authorization still applies. Native
 interruption/failure suspends the checkpoint. There is no restart
 from failure, permission prompts, server restart, or an explicit user stop.
+
+To cancel an unfinished plan in the current session, send `Cancel this task.`
+as a standalone message. The guard preserves the cancelled checkpoint and
+rejects resuming it. A later user request can register a new plan in the same
+session. The most recent cancelled checkpoint remains in native plugin storage.
 
 Automatic recovery is bounded to twelve nudges per activation, three consecutive
 nudges without milestone progress, and a 24-hour window. Exhaustion reports an

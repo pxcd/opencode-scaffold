@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.7
+# Native Sol Cartman + local OpenCode scaffold 4.3.19
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -194,12 +194,37 @@ loading with hand-maintained directory allowlists.
 For this scaffold repository, use one focused branch, a coherent commit and a PR
 to main. Run the generator/update tests, native config discovery and hook tests;
 obtain fresh independent review of the final commit and satisfy the hosted gates.
-After explicit merge authorization, squash-merge remotely, fast-forward local main,
-smoke-test disposable project generation/update, then delete only the completed
-branch and publish the accepted version tag. No project migration is implied.
+After explicit merge authorization, merge the exact head from Stan's PASS using
+`gh pr merge <pr-url> --squash --match-head-commit <reviewed-head-sha>`.
+After GitHub confirms the merge, update local `main`,
+smoke-test disposable project generation/update, then delete the completed branch.
+No project migration is implied.
 The shared SCM policy is in `files/.opencode/WORKFLOW.md`; project-specific
 exceptions remain in each project's AGENTS.md. Keep the live template checkout
 on main between tasks: `newoc` reads its working files, including uncommitted edits.
+
+For a scaffold install or upgrade staged in a project, run
+`python3.12 .opencode/verify-scaffold.py --qa` from the checkout root. This
+checks indexed SHA-256 digests, role wiring and representative coordinator
+overrides, then runs the managed plugin tests from staged bytes. The receipt
+includes test counts and scaffold identities. Without `--qa` the command keeps its
+manifest and role checks. Project gates and independent source review still apply.
+
+Say **“Release the scaffold as vX.Y.Z”** to authorize the PR, required review and
+checks, squash merge, publication of that version tag, and completed-branch cleanup.
+Confirm the requested version matches `TEMPLATE_VERSION` before opening the PR.
+After merge and verification, run from local `main`:
+
+```sh
+python3.12 scripts/tag-release.py --version X.Y.Z --merge-commit MERGE_SHA --push
+```
+
+Use the authorized release version and the full squash-merge SHA returned by
+GitHub. The script requires the committed `TEMPLATE_VERSION` to match the
+requested version and both local and remote default `main` to match the merge
+SHA. It creates an annotated tag and publishes that validated Git object.
+Omit `--push` to create a local tag. An existing remote tag on the same commit
+is a no-op. A conflicting local or remote tag stops the release.
 
 This Git repository at `~/Development/opencode-scaffold` is the editable source
 of truth. The local `newoc` shell entry loads `newoc.zsh` directly from this repo;
@@ -212,6 +237,7 @@ or editing this repository. Validate changes before generating or updating proje
 python3.12 -m unittest -v test_newoc.py
 NEWOC_NATIVE_TESTS=1 python3.12 -m unittest -v test_newoc.ScaffoldTests.test_native_layers_preserve_models_steps_permissions_and_plugins
 node --test files/.opencode/plugins/step-limit-compat/normalize.test.mjs
+node --test files/.opencode/plugins/qa-retry-guard/guard.test.mjs
 python3.12 deploy.py                 # preview installed-starter replacement
 python3.12 deploy.py --apply         # explicit deployment; retain previous backup
 ```
@@ -383,13 +409,29 @@ twelve automatic nudges, or a 24-hour activation window. A bounded stop is repor
 as incomplete/blocked, never acceptance. Progress evidence remains a coordinator
 claim; this is not an independent QA verifier or an OS-enforced execution budget.
 
+When the /ship v1 confirmation includes `.opencode/scaffold.json` among its
+committed or staged files, the QA guard marks Cartman's native Kyle handoff.
+For manual scaffold QA, start the assignment with the line `Scaffold QA: staged`. Kyle can inspect the source first. His first shell
+gate uses the native verifier with `--qa` under normal OpenCode permissions.
+The gate supplies execution evidence; Kyle still issues the independent verdict.
+
+Repeated identical foreground shell calls, three matching prefix reads, or two
+empty pages from the same diff end tool use for that turn. If only the verdict
+is missing, Cartman resumes the same Kyle with `Scaffold QA: verdict only`.
+The native gate pins the verifier to the Git blob in the captured index. It
+accepts the receipt only if the verifier reports the same digest for the index
+it checked. A resume rechecks the staged snapshot before reusing
+a passing receipt. A missing or stale receipt requires fresh staged QA.
+A verdict-only resume gives Kyle a tool-free turn to use that evidence. Kyle must return his own evidence-based verdict.
+For intentional sampling of an intermittent failure, run a bounded series.
+
 Interruption monitoring and idle continuation were exercised with OpenCode 2.3.0
 using a loopback fake model. The hook is experimental; revalidate native compatibility
 on upgrades. These commands use isolated fixtures and no real model inference:
 
 ```sh
 node --test files/.opencode/plugins/continuation-guard/guard.test.mjs
-NEWOC_NATIVE_TESTS=1 python3.12 -B -m unittest -v test_continuation_native.py
+NEWOC_NATIVE_TESTS=1 python3.12 -B -m unittest -v test_continuation_native.py test_scaffold_qa_native.py
 ```
 
 Existing deployed projects are unchanged until a separately authorized update.
@@ -450,3 +492,28 @@ as project policy. Project-owned PROJECT.md, AGENTS.md, source, and Git state re
 untouched; this does not start training, inference or inspect private datasets.
 The launcher validates the chosen title helper model as local, including a legacy
 probe title override, and otherwise preserves the native title route.
+
+### Pre-push credential scanning
+
+Install the **Gitleaks 8.30.1** CLI on the host PATH used by Git and OpenCode.
+Use the matching release archive and verify its SHA-256 against the official
+release checksums before extraction. Scans run offline with the pinned default
+rules and fully redacted findings. [Gitleaks release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1)
+
+Run `newoc --enable-secret-scan` once per clone to activate the pre-push hook.
+Git shares that hook across the clone's worktrees. Ordinary scaffold deployment
+and updates leave active hooks alone. The hook is a trusted standalone copy
+from the newoc installation. To upgrade an installed copy, review the difference
+and replace it explicitly. For an existing hook manager (including Git LFS),
+add the reviewed scanner as a pre-push step with the argument `pre-push`.
+Each hook that reads Git's ref updates must receive its own copy of the original
+stdin. Keep the existing manager, its arguments and its exit status.
+
+A matching /ship plugin scans branch history and the confirmed staged tree
+before model handoff. The hook checks every non-deletion ref update, including
+intermediate commits. A new ref or an unavailable old tip gets a full ancestry
+scan. Findings, incomplete history and scanner errors block the operation.
+Reports identify locations and rules. Fix the affected outgoing commits before
+retrying. The gate scans Git file patches. Commit/tag messages, external LFS
+payloads and opaque binaries need separate coverage. Local hooks can be
+bypassed, so repository-side push protection remains useful.

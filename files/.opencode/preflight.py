@@ -5,6 +5,59 @@ import os
 from pathlib import Path
 
 OVERRIDES = Path('.opencode/opencode.json')
+COORDINATORS = ('Cartman', 'build')
+NON_ORCHESTRATION_DIRECTORIES = {'evidence', 'node_modules', '__pycache__', '.git'}
+
+
+def validate_coordinator_overrides(defaults, overrides):
+    """Validate the coordinator entries from supplied project config layers."""
+    if not isinstance(overrides, dict):
+        raise ValueError('Project overrides must be a JSON object')
+    if overrides.get('default_agent', 'Cartman') != 'Cartman':
+        raise ValueError('Project override conflicts with scaffold default_agent Cartman')
+    agents = overrides.get('agents', {})
+    if not isinstance(agents, dict):
+        raise ValueError('Project agents override must be an object')
+    # Both entry points are the same coordinator. Do not silently lose a stricter
+    # project rule when Desktop chooses build instead of the explicit Cartman role.
+    coordinator_permissions = []
+    for role in COORDINATORS:
+        custom = agents.get(role, {})
+        if not isinstance(custom, dict):
+            raise ValueError(f'Invalid project override for {role}')
+        shared = defaults['agents'][role]
+        if custom.get('disabled') or custom.get('mode', 'primary') != 'primary':
+            raise ValueError(f'Project override disables or changes required role {role}')
+        if custom.get('model', shared['model']) != shared['model']:
+            raise ValueError(f'Project override conflicts with pinned {role} model')
+        policy = defaults['agents']['build']['system']
+        if custom.get('system', policy) != policy:
+            raise ValueError(f'Project {role} system override conflicts with the shared coordinator policy; move project constraints to project-owned AGENTS.md, PROJECT.md or native instructions before updating')
+        steps = custom.get('steps', shared['steps'])
+        if type(steps) is not int or steps < 1:
+            raise ValueError(f'Invalid project step limit for {role}')
+        rules = custom.get('permissions', [])
+        if not isinstance(rules, list) or any(
+                not isinstance(rule, dict)
+                or not all(isinstance(rule.get(k), str) for k in ('action', 'resource', 'effect'))
+                or rule['effect'] not in ('allow', 'ask', 'deny') for rule in rules):
+            raise ValueError(f'Invalid project permission override for {role}')
+        coordinator_permissions.append(rules)
+    if coordinator_permissions[0] != coordinator_permissions[1]:
+        raise ValueError('Mirror coordinator permission overrides in agents.Cartman.permissions and agents.build.permissions before updating or dispatching')
+    return agents
+
+
+def validate_required_subagents(defaults, agents):
+    """Keep managed worker and reviewer roles enabled in the project layer."""
+    for role in ('Butters', 'Kyle', 'Stan', 'Chef'):
+        if role not in defaults['agents']:
+            continue
+        custom = agents.get(role, {})
+        if not isinstance(custom, dict):
+            raise ValueError(f'Invalid project override for {role}')
+        if custom.get('disabled') or custom.get('mode', 'subagent') != 'subagent':
+            raise ValueError(f'Project override disables or changes required role {role}')
 
 
 def validate_overrides(target, defaults, overrides=None):
@@ -16,53 +69,43 @@ def validate_overrides(target, defaults, overrides=None):
         raise ValueError('Refusing symlink project overrides')
     if overrides is None:
         overrides = json.loads(path.read_text()) if path.exists() else {}
-    if not isinstance(overrides, dict):
-        raise ValueError('Project overrides must be a JSON object')
-    if overrides.get('default_agent', 'Cartman') != 'Cartman':
-        raise ValueError('Project override conflicts with scaffold default_agent Cartman')
-    agents = overrides.get('agents', {})
-    if not isinstance(agents, dict):
-        raise ValueError('Project agents override must be an object')
-    coordinators = ('Cartman', 'build')
-    # Both entry points are the same coordinator. Do not silently lose a stricter
-    # project rule when Desktop chooses build instead of the explicit Cartman role.
-    coordinator_permissions = []
-    for role in coordinators:
-        custom = agents.get(role, {})
-        if not isinstance(custom, dict):
-            raise ValueError(f'Invalid project override for {role}')
-        coordinator_permissions.append(custom.get('permissions', []))
-    if coordinator_permissions[0] != coordinator_permissions[1]:
-        raise ValueError('Mirror coordinator permission overrides in agents.Cartman.permissions and agents.build.permissions before updating or dispatching')
+    protected = set()
+    # Inspect names, not contents. Include shipped and existing custom orchestration;
+    # never walk investigation logs or dependency/vendor trees for this check.
+    for folder in (Path(__file__).resolve().parent, target / '.opencode'):
+        for parent, directories, files in os.walk(folder, followlinks=False):
+            directories[:] = [d for d in directories if d not in NON_ORCHESTRATION_DIRECTORIES]
+            for name in files:
+                relative = (Path(parent) / name).relative_to(folder)
+                if relative != Path('PROJECT.md'):
+                    protected.add(str(Path('.opencode') / relative))
+    validate_project_policy(target, defaults, overrides, protected)
+    return overrides
+
+
+def validate_project_policy(target, defaults, overrides, protected_paths):
+    """Check supplied settings without loading project configuration from disk."""
+    agents = validate_coordinator_overrides(defaults, overrides)
+    validate_required_subagents(defaults, agents)
     global_rules = overrides.get('permissions', [])
     if not isinstance(global_rules, list) or any(
             not isinstance(r, dict) or not all(isinstance(r.get(k), str) for k in ('action', 'resource', 'effect'))
             or r['effect'] not in ('deny', 'allow', 'ask') for r in global_rules):
         raise ValueError('Project permissions must be a list of action/resource/effect rules')
     protected = {'opencode.json', 'opencode.jsonc', '.opencode/opencode.json', '.opencode/opencode.jsonc'}
-    # Inspect names, not contents. Include shipped and existing custom orchestration;
-    # never walk investigation logs or dependency/vendor trees for this check.
-    for folder in (Path(__file__).resolve().parent, target / '.opencode'):
-        for parent, directories, files in os.walk(folder, followlinks=False):
-            directories[:] = [d for d in directories if d not in ('evidence', 'node_modules', '__pycache__', '.git')]
-            for name in files:
-                relative = (Path(parent) / name).relative_to(folder)
-                if relative != Path('PROJECT.md'):
-                    protected.add(str(Path('.opencode') / relative))
+    for path in protected_paths:
+        if (path.startswith('.opencode/') and path != '.opencode/PROJECT.md'
+                and NON_ORCHESTRATION_DIRECTORIES.isdisjoint(Path(path).parts[1:-1])):
+            protected.add(path)
+    root = target.resolve()
     for role, shared in defaults['agents'].items():
         custom = agents.get(role, {})
         if not isinstance(custom, dict):
             raise ValueError(f'Invalid project override for {role}')
-        if role in (*coordinators, 'Stan', 'Chef') and custom.get('model', shared['model']) != shared['model']:
+        if role in ('Stan', 'Chef') and custom.get('model', shared['model']) != shared['model']:
             raise ValueError(f'Project override conflicts with pinned {role} model')
-        if role in (*coordinators, 'Butters', 'Kyle', 'Stan', 'Chef'):
-            mode = 'primary' if role in coordinators else 'subagent'
-            if custom.get('disabled') or custom.get('mode', mode) != mode:
-                raise ValueError(f'Project override disables or changes required role {role}')
         if role == 'Chef' and ('system' in custom or 'request' in custom):
             raise ValueError('Project override conflicts with Chef planning policy or request settings')
-        if role in coordinators and 'system' in custom and custom['system'] != defaults['agents']['build']['system']:
-            raise ValueError(f'Project {role} system override conflicts with the shared coordinator policy; move project constraints to project-owned AGENTS.md, PROJECT.md or native instructions before updating')
         rules = custom.get('permissions', [])
         if not isinstance(rules, list):
             raise ValueError(f'Project {role} permissions must be a list')
@@ -97,15 +140,15 @@ def validate_overrides(target, defaults, overrides=None):
                 if fnmatchcase(action, rule['action']) and fnmatchcase(resource, rule['resource']):
                     effect = rule['effect']
             return effect
-        if role in (*coordinators, 'Butters', 'Kyle', 'Stan', 'title', 'summary', 'compaction'):
+        if role in (*COORDINATORS, 'Butters', 'Kyle', 'Stan', 'title', 'summary', 'compaction'):
             if decision('external_directory', '*') == 'allow':
                 raise ValueError(f'Project override grants unrestricted external access to {role}; use explicitly authorized scoped paths')
         if role in ('Butters', 'Kyle'):
             for path in sorted(protected):
-                for resource in (path, str(target.resolve() / path)):
+                for resource in (path, str(root / path)):
                     if decision('edit', resource) == 'allow':
                         raise ValueError(f'Project override permits {role} to edit orchestration: {path}')
-        if role in coordinators:
+        if role in COORDINATORS:
             children = {r['resource'] for r in shared['permissions']
                         if r['action'] == 'subagent' and r['effect'] == 'allow'}
             # A project can opt out of the advisory cloud route.
@@ -116,4 +159,4 @@ def validate_overrides(target, defaults, overrides=None):
             for action in ('edit', 'shell', 'execute', 'subagent', 'external_directory'):
                 if decision(action, '*') != 'deny':
                     raise ValueError(f'Project override weakens Stan {action} denial')
-    return overrides
+    return agents

@@ -436,14 +436,57 @@ def scaffold(target: Path, name: str, *, existing: bool) -> Path:
     return target.resolve()
 
 
+def enable_secret_scan(target):
+    """Install into Git's default clone-local hooks directory only on explicit request."""
+    def git(*args):
+        return subprocess.run(['git', *args], cwd=target, capture_output=True, text=True)
+
+    root = git('rev-parse', '--show-toplevel')
+    if root.returncode or Path(root.stdout.strip()).resolve() != target.resolve():
+        raise ValueError('Run --enable-secret-scan from the intended Git checkout root')
+    hook_setting = git('config', '--get', 'core.hooksPath')
+    if hook_setting.returncode != 1:
+        raise ValueError('Existing hook configuration preserved. Integrate the scanner with your hook manager (see README).')
+    common = git('rev-parse', '--path-format=absolute', '--git-common-dir')
+    if common.returncode:
+        raise ValueError('Cannot locate the clone-local hooks directory')
+    hooks = Path(common.stdout.rstrip('\n')) / 'hooks'
+    if hooks.is_symlink():
+        raise ValueError('Existing symlinked hook directory preserved')
+    hook = hooks / 'pre-push'
+    source = (TEMPLATE / '.opencode/scan-gitleaks.py').read_bytes()
+    if hook.is_symlink() or hook.exists():
+        if not hook.is_symlink() and hook.is_file() and hook.read_bytes() == source and os.access(hook, os.X_OK):
+            return
+        raise ValueError('Existing pre-push hook preserved. Integrate the scanner with that hook (see README).')
+    hooks.mkdir(exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=hooks) as stage:
+        stage.write(source)
+        stage.flush()
+        os.fchmod(stage.fileno(), 0o755)
+        os.link(stage.name, hook)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Create an OpenCode-ready project in ~/Development, or add the scaffold to the current project.')
     parser.add_argument('name', nargs='?', help='New project directory name (letters, numbers, dots, underscores or hyphens)')
     parser.add_argument('--here', action='store_true', help='Add roles/workflow to the current directory; preserve existing README and append missing ignore rules')
     parser.add_argument('--update', action='store_true', help='Preview an update to managed files in the current project')
+    parser.add_argument('--enable-secret-scan', action='store_true', help='Install the clone-local pre-push credential scan explicitly')
     parser.add_argument('--apply', action='store_true', help='Apply --update after all ownership checks pass')
     parser.add_argument('--root', type=Path, default=Path.home()/'Development', help='Parent for a new project (default: ~/Development)')
     args = parser.parse_args()
+    if args.enable_secret_scan:
+        if args.apply or args.update or args.here or args.name:
+            parser.error('--enable-secret-scan is a standalone setup command')
+        try:
+            enable_secret_scan(Path.cwd())
+        except (OSError, ValueError) as error:
+            print(f'newoc: {error}', file=sys.stderr)
+            return 1
+        print('Clone-local credential pre-push hook enabled.', file=sys.stderr)
+        print(Path.cwd())
+        return 0
     if args.apply and not args.update:
         parser.error('--apply requires --update')
     if args.update:

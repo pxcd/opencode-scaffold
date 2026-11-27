@@ -80,8 +80,10 @@ export async function install(ctx, now = Date.now) {
       const state = old && structuredClone(old);
       if (input.action === 'status') return { content: JSON.stringify(state ?? { phase: 'unarmed' }) };
       if (input.action === 'start') {
-        if (old && old.phase !== 'complete' && !old.freshInput)
-          throw new Error('Preserve the existing plan; blocked/paused work needs fresh user input');
+        if (old?.phase === 'cancelled' && !old.freshInput)
+          throw new Error('A cancelled plan needs a new user request before starting other work');
+        if (old && !['complete', 'cancelled'].includes(old.phase))
+          throw new Error('Preserve the existing plan; reconcile or rebind unfinished work before continuing');
         const goal = text(input.goal, 'goal', 1000);
         if (!Array.isArray(input.milestones) || !input.milestones.length || input.milestones.length > 32)
           throw new Error('Register 1–32 milestones covering the full authorized task');
@@ -91,13 +93,19 @@ export async function install(ctx, now = Date.now) {
         const nextAction = text(input.next_action, 'next_action');
         const fresh = { version: 1, root, goal, milestones, nextAction, phase: 'active',
           revision: 0, lastRevision: -1, resumes: 0, stalls: 0, started: now(), freshInput: false };
+        if (old?.phase === 'cancelled') {
+          await ctx.storage.set(key(id) + ':last-cancelled', old);
+          if (epoch(id) !== version) throw new Error('New input or interruption superseded this checkpoint action');
+        }
         await put(id, fresh); clear(id, version); return { content: JSON.stringify(fresh) };
       }
       if (!state) throw new Error('Register the task first');
+      if (state.phase === 'cancelled') throw new Error('The cancelled plan cannot resume');
       if (state.root !== root && input.action !== 'rebind')
         throw new Error('Checkpoint belongs to another checkout; rebind only after an authorized native move');
       if (input.action === 'rebind') {
-        if (state.phase !== 'active' || state.root === root) throw new Error('Rebind requires an active task and an actual checkout change');
+        if (!['active', 'paused'].includes(state.phase) || state.root === root)
+          throw new Error('Rebind requires an active or paused task and an actual checkout change');
         state.reason = text(input.reason, 'authorized move reason');
         state.nextAction = text(input.next_action, 'next_action');
         state.root = root; // State transfer only: this tool never moves a session or grants access.
@@ -134,7 +142,7 @@ export async function install(ctx, now = Date.now) {
         } else throw new Error('Unknown checkpoint action');
       }
       await put(id, state);
-      if (input.action === 'resume' || input.action === 'rebind') clear(id, version);
+      if (input.action === 'resume' || (input.action === 'rebind' && state.phase === 'active')) clear(id, version);
       return { content: JSON.stringify(state) };
     });
   }
@@ -157,10 +165,28 @@ export async function install(ctx, now = Date.now) {
   }));
   registrations.push(await ctx.session.hook('prompt', async event => {
     const version = suspend(event.sessionID); // Fence BEFORE awaiting the session lock.
+    // Queue explicit user cancellation before resolving scope so a native
+    // interruption cannot discard it while the session lookup is pending.
+    if (/^cancel this task\.?$/i.test(event.prompt?.text?.trim() ?? '')) {
+      return serial(event.sessionID, async () => {
+        if (!await primary(event.sessionID)) { clear(event.sessionID, version); return; }
+        const state = await get(event.sessionID);
+        if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
+        state.phase = 'cancelled'; state.freshInput = false;
+        state.reason = 'User explicitly cancelled the task';
+        await put(event.sessionID, state);
+      });
+    }
     if (!await primary(event.sessionID)) { clear(event.sessionID, version); return; }
     await serial(event.sessionID, async () => {
       const state = await get(event.sessionID);
+      if (epoch(event.sessionID) !== version) return;
       if (!state || state.phase === 'complete') { clear(event.sessionID, version); return; }
+      if (state.phase === 'cancelled') {
+        state.freshInput = true;
+        await put(event.sessionID, state);
+        return;
+      }
       state.phase = 'paused'; state.freshInput = true;
       state.reason = 'New user input: reconcile the latest instruction before resuming';
       await put(event.sessionID, state);
@@ -204,9 +230,14 @@ export async function install(ctx, now = Date.now) {
         const version = suspend(id); // Do not queue cancellation behind the idle hook.
         await serial(id, async () => {
           const state = await get(id);
-          if (!state || state.phase !== 'active') { if (!state || state.phase === 'complete') clear(id, version); return; }
-          state.phase = 'paused'; state.freshInput = false;
-          state.reason = 'Native execution interrupted or failed; no automatic restart';
+          if (!state || state.phase === 'complete') { clear(id, version); return; }
+          if (state.phase !== 'active' && !state.freshInput) return;
+          // Revoke a prompt that already persisted while this event waited for the lock.
+          state.freshInput = false;
+          if (!['blocked', 'cancelled'].includes(state.phase)) {
+            state.phase = 'paused';
+            state.reason = 'Native execution interrupted or failed; no automatic restart';
+          }
           await put(id, state);
         });
       }

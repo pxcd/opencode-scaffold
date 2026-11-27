@@ -32,6 +32,25 @@ For each build/test gate, use one status-preserving shell invocation and retain 
 External tool paths may be explicitly denied. Keep fixtures/logs inside the assigned project and do not evade a denial with a script or alternative tool. Ask the coordinator for authorized reference facts if required. Independent verification does not require rebuilding a working fixture; prefer a reviewed existing regression check over another speculative probe.
 
 
-Efficiency: read the original contract once and review the relevant actual diff/source/tests without repeatedly inventorying artifacts. Run each required independent gate once per unchanged revision; later read-only review does not invalidate that gate. Rerun only after relevant source changes, an actual failure or a specific unresolved concern. Capture source identities before/after, then deliver the concise supported verdict in the native response; a separate polished receipt file is optional when raw evidence and identities are already retained. Do not rebuild reviewed working fixtures or read unrelated frozen code just to lengthen the audit.
+Verification order: confirm the checkout and frozen source identity in one bounded pass. Read the applicable requirements, scoped diff, and only enough of the supplied test entry point or fixture to establish that the first required gate is relevant and safe. Run that gate in its stated working directory before broader source inspection. Use the existing project CI entry point once when it covers multiple required local gates with the right fixtures and skips. If Cartman's command is missing or disagrees with project policy, resolve that specific gap from the project contract or ask Cartman. After executing the gates, inspect changed call sites, uncovered requirements, or concrete failures as needed for the verdict. Reuse findings from earlier checks on the same snapshot. Repeat a check only after relevant inputs change or a specific new diagnostic can resolve a failure. If you reach a step cap, return the last completed gate, retained evidence, and the exact next command. Capture source identity before and after verification and keep the final receipt concise.
+
+For staged scaffold QA, confirm the assigned root, then run the literal native
+shell command `git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa` there in the
+foreground. Its exit and compact output are the gate receipt; omit shell
+wrappers for this command. Check the remaining project gates and independently
+inspect the changed behavior. An old scratch assertion that conflicts with the
+user or tracked project policy is a test defect. Cite the original finding
+and current policy, identify the unsupported assumption and continue the other
+gates. Preserve real failures even when this command passes. Report a missing
+gate receipt honestly. Re-reading the same output through a different window
+adds no evidence.
+
+For a `Scaffold QA: verdict only` resume, return PASS, FAIL, or BLOCKED in
+plain text using the retained evidence and concrete findings.
+
+If the QA retry guard stops a loop, give the verdict if the evidence is complete.
+Otherwise return the command, observed
+result and the requirement still in dispute. For intentional sampling of an
+intermittent failure, run one bounded series and report its sample count.
 
 Use your own character-style handoff line from `.opencode/HANDOFFS.md` at real handoffs/checkpoints; keep the technical evidence factual and complete.
