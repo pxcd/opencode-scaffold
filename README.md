@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.17
+# Native Sol Cartman + local OpenCode scaffold 4.3.18
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -416,8 +416,10 @@ The gate supplies execution evidence; Kyle still issues the independent verdict.
 Repeated identical foreground shell calls, three matching prefix reads, or two
 empty pages from the same diff end tool use for that turn. If only the verdict
 is missing, Cartman resumes the same Kyle with `Scaffold QA: verdict only`.
-The native gate pins the verifier to the Git blob in the captured index. A
-same-snapshot resume keeps the passing receipt and can run remaining checks.
+The native gate pins the verifier to the Git blob in the captured index. It
+accepts the receipt only if the verifier reports the same digest for the index
+it checked. A same-snapshot resume keeps the passing receipt and can run
+remaining checks.
 A verdict-only resume gives Kyle a tool-free turn to use that evidence. Kyle must return his own evidence-based verdict.
 For intentional sampling of an intermittent failure, run a bounded series.
 

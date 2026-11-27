@@ -53,9 +53,10 @@ async function stagedIdentity(root) {
     const verifier = blobs.get(VERIFIER);
     if (!verifier || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(verifier)
         || !blobs.has(MANIFEST)) return undefined;
+    const indexDigest = createHash('sha256').update(index.stdout).digest('hex');
     const receipt = 'PASS: staged scaffold QA (manifest ' + blobs.get(MANIFEST)
       + ', project overrides ' + (blobs.get(OVERRIDES) ?? 'absent')
-      + ', verifier ' + verifier + ', plugin suite exit 0)';
+      + ', verifier ' + verifier + ', index SHA-256 ' + indexDigest + ', plugin suite exit 0)';
     return { identity: createHash('sha256').update(head.stdout).update(index.stdout).digest('hex'), verifier, receipt };
   } catch {
     return undefined;
@@ -96,10 +97,10 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
         state = { ...state, assignment: task.id, phase: 'verdict' };
         await ctx.storage.set(key(id), state);
       } else if (task.metadata[FIELD] === (primary ? 'ship' : 'gate')) {
-        const verified = !primary && state?.verifiedPinned;
+        const verified = !primary && state?.verifiedIndex;
         const current = verified ? await snapshot(root) : undefined;
         state = verified && current?.identity === verified
-          ? { assignment: task.id, phase: 'finished', verifiedPinned: verified }
+          ? { assignment: task.id, phase: 'finished', verifiedIndex: verified }
           : { assignment: task.id, phase: primary ? 'ship' : 'pending' };
         await ctx.storage.set(key(id), state);
       } else if (state) {
@@ -116,7 +117,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     if (!state) { guarded.delete(id); return; }
     guarded.set(id, state);
     if (state.phase === 'finished') {
-      if (state.verifiedPinned) request.system.push({ type: 'text', text:
+      if (state.verifiedIndex) request.system.push({ type: 'text', text:
         'This Kyle session already has a verified staged QA receipt. Use it for the same snapshot. '
         + 'Run only any remaining checks and return the independent verdict.' });
       return;
@@ -127,7 +128,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     }
     if (state.phase === 'verdict') {
       const identity = await snapshot(root);
-      const reusable = Boolean(state.verifiedPinned && identity?.identity === state.verifiedPinned);
+      const reusable = Boolean(state.verifiedIndex && identity?.identity === state.verifiedIndex);
       const instruction = reusable
         ? 'Give your independent QA verdict as plain text now. Start with PASS, FAIL, or BLOCKED. Use your recorded verifier exit 0 and your existing source inspection. Name concrete findings or missing evidence. If evidence is incomplete, return BLOCKED and name the exact gap. No tools are available. Do not emit tool-call markup.'
         : 'Return BLOCKED in plain text. There is no verified passing gate for the current staged snapshot. Tell Cartman to start staged QA on the current snapshot.';
@@ -146,7 +147,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
         + COMMAND + ' exactly, from this root, in the foreground. Its output is the receipt; no shell wrapper is needed. '
         + 'Use read tools to inspect safety first if necessary. Run the gate before scratch probes. Independently assess '
         + 'the diff and remaining project gates afterward. A checkpoint or scratch assertion cannot add requirements.'
-      : 'The staged scaffold gate has no verified receipt. Report a checkpoint with the observed error or '
+      : (state.reason ?? 'The staged scaffold gate has no verified receipt.') + ' Report a checkpoint with the observed error or '
         + 'pending job, and return to Cartman. Do not rerun it or claim a passing gate.' });
   });
   await ctx.tool.hook('execute.before', async event => {
@@ -160,7 +161,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     if (event.agent !== 'Kyle' || !state) return;
     if (state.phase === 'finished') {
       const command = event.input?.command;
-      if (state.verifiedPinned && event.tool === 'shell'
+      if (state.verifiedIndex && event.tool === 'shell'
           && (command === COMMAND || (typeof command === 'string' && command.startsWith(PINNED_PREFIX)
               && command.endsWith(GATE_SUFFIX)))) {
         throw new Error('This assignment already earned a passing staged QA receipt. Reuse it on the same snapshot; '
@@ -199,9 +200,10 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
       if (after?.identity === state.before.identity
           && typeof output.output === 'string'
           && output.output.split(/\r?\n/).includes(state.before.receipt)) {
-        updated.verifiedPinned = state.before.identity;
+        updated.verifiedIndex = state.before.identity;
       } else {
         updated.phase = 'blocked';
+        updated.reason = 'The verifier receipt did not match the captured staged index.';
       }
     }
     // A nonzero exit is a completed, failed check. Kyle can diagnose it;

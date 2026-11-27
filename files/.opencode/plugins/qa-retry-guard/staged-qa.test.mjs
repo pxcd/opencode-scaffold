@@ -8,7 +8,7 @@ const manifest = '.opencode/scaffold.json';
 const marker = 'Scaffold QA: staged';
 const ship = { version: 1, snapshot: 'fixture-id', branch: 'feature', head: 'fixture-head' };
 
-const receipt = 'PASS: staged scaffold QA (manifest 111, project overrides 222, verifier 333, plugin suite exit 0)';
+const receipt = 'PASS: staged scaffold QA (manifest 111, project overrides 222, verifier 333, index SHA-256 fixture-index-a, plugin suite exit 0)';
 const verifier = 'a'.repeat(40);
 const staged = identity => identity && { identity, receipt, verifier };
 const pinned = 'git --no-replace-objects --no-optional-locks cat-file blob ' + verifier + ' | python3.12 -I - --qa';
@@ -88,6 +88,8 @@ for (const [label, status, output, done] of [
   ['zero exit', 'completed', { exitCode: 0, output: receipt }, true], ['test failure', 'completed', { exitCode: 1 }, true],
   ['denial', 'error', undefined, false], ['background', 'completed', { exitCode: null, shellID: 'job' }, false],
   ['zero exit without receipt', 'completed', { exitCode: 0, output: 'OK' }, false],
+  ['zero exit with another verified index', 'completed',
+    { exitCode: 0, output: receipt.replace('fixture-index-a', 'fixture-index-b') }, false],
   ['zero exit with wrong verifier', 'completed', { exitCode: 0, output: receipt.replace('333', '444') }, false],
   ['interruption', 'completed', { exitCode: 143, signal: 'TERM' }, false],
 ]) {

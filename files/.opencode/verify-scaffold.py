@@ -27,21 +27,21 @@ VERIFIER = '.opencode/verify-scaffold.py'
 
 
 def git(*args):
-    result = subprocess.run(['git', '--no-optional-locks', *args], capture_output=True)
+    result = subprocess.run(['git', '--no-replace-objects', '--no-optional-locks', *args], capture_output=True)
     if result.returncode:
         raise ValueError(f'git {args[0]}: {result.stderr.decode(errors="replace").strip()}')
     return result.stdout
 
 
-def scaffold_index():
-    if git('rev-parse', '--show-prefix').strip():
-        raise ValueError('Run this command from the project checkout root')
+def scaffold_index(listing):
     entries = {}
-    for line in git('ls-files', '--stage', '-z', '--', 'opencode.json', 'opencode.jsonc', '.opencode').split(b'\0'):
+    for line in listing.split(b'\0'):
         if line:
             metadata, path = line.split(b'\t', 1)
             mode, oid, stage = metadata.decode().split()
             name = path.decode(errors='surrogateescape')
+            if name not in ('opencode.json', 'opencode.jsonc', '.opencode') and not name.startswith('.opencode/'):
+                continue
             if stage != '0':
                 raise ValueError(f'Unmerged scaffold index path: {name!r}')
             entries[name] = (mode, oid)
@@ -110,7 +110,12 @@ def check_coordinator_policy(validate, defaults):
 
 
 def verify(qa=False):
-    index = scaffold_index()
+    if git('rev-parse', '--show-prefix').strip():
+        raise ValueError('Run this command from the project checkout root')
+    # Parse and fingerprint a single listing. A later index read may see a
+    # restored snapshot and cannot say which entries were actually validated.
+    listing = git('ls-files', '--stage', '-z')
+    index = scaffold_index(listing)
 
     def read(path):
         entry = index.get(path)
@@ -190,11 +195,12 @@ def verify(qa=False):
     if qa:
         check_coordinator_policy(validate, config)
         run_staged_suites(managed)
-        if scaffold_index() != index:
+        if git('ls-files', '--stage', '-z') != listing:
             raise ValueError('Scaffold index changed during QA; verify the new snapshot')
         override_oid = index[OVERRIDES][1] if OVERRIDES in index else 'absent'
         print(f'PASS: staged scaffold QA (manifest {index[MANIFEST][1]}, '
-              f'project overrides {override_oid}, verifier {index[VERIFIER][1]}, plugin suite exit 0)')
+              f'project overrides {override_oid}, verifier {index[VERIFIER][1]}, '
+              f'index SHA-256 {hashlib.sha256(listing).hexdigest()}, plugin suite exit 0)')
 
 
 if __name__ == '__main__':
