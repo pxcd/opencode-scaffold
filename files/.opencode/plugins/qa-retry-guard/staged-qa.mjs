@@ -5,7 +5,9 @@ import { promisify } from 'node:util';
 const exec = promisify(execFile);
 const MARKER = 'Scaffold QA: staged';
 const VERDICT = 'Scaffold QA: verdict only';
-const COMMAND = 'python3.12 .opencode/verify-scaffold.py --qa';
+const VERIFIER = '.opencode/verify-scaffold.py';
+const COMMAND = 'git --no-optional-locks show :' + VERIFIER + ' | python3.12 -I - --qa';
+const OVERRIDES = '.opencode/opencode.json';
 const MANIFEST = '.opencode/scaffold.json';
 const READS = new Set(['read', 'glob', 'grep']);
 
@@ -36,7 +38,16 @@ async function stagedIdentity(root) {
     const options = { cwd: root, encoding: 'buffer', maxBuffer: 16 * 1024 * 1024 };
     const head = await exec('git', ['--no-optional-locks', 'rev-parse', '--verify', 'HEAD'], options);
     const index = await exec('git', ['--no-optional-locks', 'ls-files', '--stage', '-z'], options);
-    return createHash('sha256').update(head.stdout).update(index.stdout).digest('hex');
+    const blobs = new Map();
+    for (const record of index.stdout.toString('utf8').split('\0')) {
+      const match = /^(100644|100755) ([a-f0-9]+) 0\t(.+)$/.exec(record);
+      if (match) blobs.set(match[3], match[2]);
+    }
+    if (!blobs.has(VERIFIER) || !blobs.has(MANIFEST)) return undefined;
+    const receipt = 'PASS: staged scaffold QA (manifest ' + blobs.get(MANIFEST)
+      + ', project overrides ' + (blobs.get(OVERRIDES) ?? 'absent')
+      + ', verifier ' + blobs.get(VERIFIER) + ', plugin suite exit 0)';
+    return { identity: createHash('sha256').update(head.stdout).update(index.stdout).digest('hex'), receipt };
   } catch {
     return undefined;
   }
@@ -97,7 +108,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     }
     if (state.phase === 'verdict') {
       const identity = await snapshot(root);
-      const reusable = Boolean(state.passed && identity && identity === state.passed);
+      const reusable = Boolean(state.verified && identity?.identity === state.verified);
       const instruction = reusable
         ? 'Give your independent QA verdict as plain text now. Start with PASS, FAIL, or BLOCKED. Use your recorded verifier exit 0 and your existing source inspection. Name concrete findings or missing evidence. If evidence is incomplete, return BLOCKED and name the exact gap. No tools are available. Do not emit tool-call markup.'
         : 'Return BLOCKED in plain text. There is no verified passing gate for the current staged snapshot. Tell Cartman to start staged QA on the current snapshot.';
@@ -116,7 +127,7 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
         + COMMAND + ' exactly, from this root, in the foreground. Its output is the receipt; no shell wrapper is needed. '
         + 'Use read tools to inspect safety first if necessary. Run the gate before scratch probes. Independently assess '
         + 'the diff and remaining project gates afterward. A checkpoint or scratch assertion cannot add requirements.'
-      : 'The staged scaffold gate has no completed foreground exit. Report a checkpoint with the observed error or '
+      : 'The staged scaffold gate has no verified receipt. Report a checkpoint with the observed error or '
         + 'pending job, and return to Cartman. Do not rerun it or claim a passing gate.' });
   });
   await ctx.tool.hook('execute.before', async event => {
@@ -136,7 +147,13 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     const running = { ...state, phase: 'running', call: event.id };
     guarded.set(event.sessionID, running);
     const before = await snapshot(root);
-    if (before) running.before = before;
+    if (!before) {
+      const blocked = { assignment: state.assignment, phase: 'blocked' };
+      guarded.set(event.sessionID, blocked);
+      await ctx.storage.set(key(event.sessionID), blocked);
+      throw new Error('Unable to identify the regular staged verifier and scaffold manifest.');
+    }
+    running.before = before;
     await ctx.storage.set(key(event.sessionID), running);
   });
   await ctx.tool.hook('execute.after', async event => {
@@ -145,12 +162,19 @@ export async function installStagedQA(ctx, snapshot = stagedIdentity) {
     const output = event.result?.output;
     const finished = event.status === 'completed' && Number.isInteger(output?.exitCode) && !output.shellID && !output.signal;
     const updated = { assignment: state.assignment, phase: finished ? 'finished' : 'blocked' };
-    if (finished && output.exitCode === 0 && state.before && await snapshot(root) === state.before) {
-      updated.passed = state.before;
+    if (finished && output.exitCode === 0 && state.before) {
+      const after = await snapshot(root);
+      if (after?.identity === state.before.identity
+          && typeof output.output === 'string'
+          && output.output.split(/\r?\n/).includes(state.before.receipt)) {
+        updated.verified = state.before.identity;
+      } else {
+        updated.phase = 'blocked';
+      }
     }
     // A nonzero exit is a completed, failed check. Kyle can diagnose it;
     // a denial or an unfinished/background command carries no such receipt.
-    if (finished) guarded.delete(event.sessionID);
+    if (updated.phase === 'finished') guarded.delete(event.sessionID);
     else guarded.set(event.sessionID, updated);
     await ctx.storage.set(key(event.sessionID), updated);
   });

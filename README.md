@@ -1,4 +1,4 @@
-# Native Sol Cartman + local OpenCode scaffold 4.3.15
+# Native Sol Cartman + local OpenCode scaffold 4.3.16
 
 The existing `newoc` command creates projects with **GPT-6.2 Sol Medium as the native
 OpenCode Cartman**, local Butters/Kyle subagents, a separate Sol **Stan**
@@ -416,8 +416,9 @@ The gate supplies execution evidence; Kyle still issues the independent verdict.
 Repeated identical foreground shell calls, three matching prefix reads, or two
 empty pages from the same diff end tool use for that turn. If only the verdict
 is missing, Cartman resumes the same Kyle with `Scaffold QA: verdict only`.
-The tool-free turn reuses a recorded zero exit only when the staged snapshot
-still matches. Kyle must return his own evidence-based verdict.
+The native gate executes the verifier from the Git index. The tool-free turn
+reuses its zero exit and matching receipt only when the staged snapshot still
+matches. Kyle must return his own evidence-based verdict.
 For intentional sampling of an intermittent failure, run a bounded series.
 
 Interruption monitoring and idle continuation were exercised with OpenCode 2.3.0

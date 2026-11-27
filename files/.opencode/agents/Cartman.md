@@ -62,7 +62,7 @@ Keep the combined task history in your short task note. Ask workers for current-
 
 For a scaffold install or update, start Kyle's handoff with `Scaffold QA: staged`
 on its own line. Give him the confirmed root, frozen identity and the single
-first gate `python3.12 .opencode/verify-scaffold.py --qa`. List additional
+first gate `git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa`. List additional
 project gates separately. On repair or resume, quote the original Stan finding
 and identify the applicable tracked requirement. Distinguish its observed
 failure from your proposed test. Check a disputed assertion against those

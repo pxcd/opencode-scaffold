@@ -124,6 +124,8 @@ def verify(qa=False):
     manifest = json_object(read(MANIFEST), MANIFEST)
     hashes = manifest.get('files')
     required = {'opencode.json', PREFLIGHT, *ROLE_FILES.values()}
+    if qa:
+        required.add(VERIFIER)
     if not isinstance(hashes, dict) or not required <= hashes.keys():
         raise ValueError('Manifest must list the shared config, preflight and all native role files')
     managed = {}
@@ -161,7 +163,9 @@ def verify(qa=False):
     if 'opencode.jsonc' in index or '.opencode/opencode.jsonc' in index:
         raise ValueError('Staged JSONC requires a reviewed migration to the scaffold JSON override layout')
     entry_point = Path(VERIFIER)
-    if qa and (entry_point.parent.is_symlink() or entry_point.is_symlink() or not entry_point.is_file()
+    # The native gate feeds the staged entry point through standard input.
+    # Direct invocations must still match the staged script on disk.
+    if qa and __file__ != '<stdin>' and (entry_point.parent.is_symlink() or entry_point.is_symlink() or not entry_point.is_file()
                or Path(__file__).resolve() != entry_point.resolve()
                or entry_point.read_bytes() != managed.get(VERIFIER)):
         raise ValueError('Working verify-scaffold.py must be a regular file matching the staged QA entry point')
@@ -174,11 +178,11 @@ def verify(qa=False):
     module = {'__file__': str(helper.resolve()), '__name__': 'scaffold_preflight'}
     exec(compile(managed[PREFLIGHT], PREFLIGHT, 'exec'), module)
     validate = module['validate_coordinator_overrides']
-    validate(config, overrides)
+    project_agents = validate(config, overrides)
+    module['validate_required_subagents'](config, project_agents)
 
     prefix = 'Verified' if qa else 'PASS:'
     print(f'{prefix} {len(managed)} staged manifest SHA-256 digests and shared native role wiring')
-    project_agents = overrides.get('agents', {})
     cartman_steps = project_agents.get('Cartman', {}).get('steps', cartman['steps'])
     build_steps = project_agents.get('build', {}).get('steps', build['steps'])
     print(f'Valid project step limits: Cartman={cartman_steps}, build={build_steps}. '
@@ -190,7 +194,7 @@ def verify(qa=False):
             raise ValueError('Scaffold index changed during QA; verify the new snapshot')
         override_oid = index[OVERRIDES][1] if OVERRIDES in index else 'absent'
         print(f'PASS: staged scaffold QA (manifest {index[MANIFEST][1]}, '
-              f'project overrides {override_oid}, plugin suite exit 0)')
+              f'project overrides {override_oid}, verifier {index[VERIFIER][1]}, plugin suite exit 0)')
 
 
 if __name__ == '__main__':

@@ -3,12 +3,15 @@ import test from 'node:test';
 import { installStagedQA } from './staged-qa.mjs';
 
 const root = '/fixture';
-const command = 'python3.12 .opencode/verify-scaffold.py --qa';
+const command = 'git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa';
 const manifest = '.opencode/scaffold.json';
 const marker = 'Scaffold QA: staged';
 const ship = { version: 1, snapshot: 'fixture-id', branch: 'feature', head: 'fixture-head' };
 
-async function host(data = new Map(), snapshot = async () => "tree-a") {
+const receipt = 'PASS: staged scaffold QA (manifest 111, project overrides 222, verifier 333, plugin suite exit 0)';
+const staged = identity => identity && { identity, receipt };
+
+async function host(data = new Map(), snapshot = async () => staged('tree-a')) {
   const hooks = {};
   const domain = { hook(name, callback) { hooks[name] = callback; } };
   await installStagedQA({ location: { directory: root }, session: domain, tool: domain,
@@ -80,8 +83,10 @@ test('only a real new task resets a marked Kyle, including across a plugin reloa
 });
 
 for (const [label, status, output, done] of [
-  ['zero exit', 'completed', { exitCode: 0 }, true], ['test failure', 'completed', { exitCode: 1 }, true],
+  ['zero exit', 'completed', { exitCode: 0, output: receipt }, true], ['test failure', 'completed', { exitCode: 1 }, true],
   ['denial', 'error', undefined, false], ['background', 'completed', { exitCode: null, shellID: 'job' }, false],
+  ['zero exit without receipt', 'completed', { exitCode: 0, output: 'OK' }, false],
+  ['zero exit with wrong verifier', 'completed', { exitCode: 0, output: receipt.replace('333', '444') }, false],
   ['interruption', 'completed', { exitCode: 143, signal: 'TERM' }, false],
 ]) {
   test(label + ' preserves the actual native gate outcome', async () => {
@@ -110,14 +115,14 @@ for (const [label, exit, after, current, valid] of [
   test(label + ' controls verdict-only receipt reuse after reload', async () => {
     const data = new Map();
     let identity = 'tree-a';
-    const h = await host(data, async () => identity);
+    const h = await host(data, async () => staged(identity));
     const qa = await h.prompt('qa', marker);
     await h.context('Kyle', [qa]);
     await h.before('Kyle', 'shell', { command });
     identity = after;
-    await h.after('completed', { exitCode: exit });
+    await h.after('completed', { exitCode: exit, output: receipt });
     identity = current;
-    const resumed = await host(data, async () => identity);
+    const resumed = await host(data, async () => staged(identity));
     const mode = 'Scaffold QA: verdict only';
     const handoff = mode + '\nGive the verdict.';
     const shipMessage = await resumed.prompt('ship', shipText({ staged: [manifest] }), { opencodeShip: ship });

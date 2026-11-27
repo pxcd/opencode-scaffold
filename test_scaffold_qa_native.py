@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent
-GATE = 'python3.12 .opencode/verify-scaffold.py --qa'
+GATE = 'git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa'
 SCRATCH = 'touch stale-probe-ran'
 NORMAL = 'echo QA_TOOLS_RESTORED'
 DIFF = 'git diff --cached -- .opencode/plugins/continuation-guard/guard.test.mjs'
@@ -60,7 +60,12 @@ class ScaffoldQANativeTests(unittest.TestCase):
                             '-c', 'commit.gpgsign=false', 'commit', '--allow-empty', '-qm', 'Native fixture'],
                            cwd=project, check=True)
             subprocess.run(['git', 'add', '--', '.opencode', 'opencode.json'], cwd=project, check=True)
+            # An unstaged verifier can exit zero and print a convincing result.
+            # The actual native command must execute the indexed script instead.
+            (project / '.opencode/verify-scaffold.py').write_text(
+                "from pathlib import Path\nPath('working-verifier-ran').touch()\nprint('PASS')\n")
             self.run_native(base, project)
+            self.assertFalse((project / 'working-verifier-ran').exists())
 
     def run_native(self, base, project):
         child_requests = []

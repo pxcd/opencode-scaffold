@@ -47,6 +47,18 @@ def validate_coordinator_overrides(defaults, overrides):
     return agents
 
 
+def validate_required_subagents(defaults, agents):
+    """Keep managed worker and reviewer roles enabled in the project layer."""
+    for role in ('Butters', 'Kyle', 'Stan', 'Chef'):
+        if role not in defaults['agents']:
+            continue
+        custom = agents.get(role, {})
+        if not isinstance(custom, dict):
+            raise ValueError(f'Invalid project override for {role}')
+        if custom.get('disabled') or custom.get('mode', 'subagent') != 'subagent':
+            raise ValueError(f'Project override disables or changes required role {role}')
+
+
 def validate_overrides(target, defaults, overrides=None):
     """Check scaffold invariants without rewriting project-owned configuration."""
     if (target / '.opencode/opencode.jsonc').exists() or (target / 'opencode.jsonc').exists():
@@ -57,6 +69,7 @@ def validate_overrides(target, defaults, overrides=None):
     if overrides is None:
         overrides = json.loads(path.read_text()) if path.exists() else {}
     agents = validate_coordinator_overrides(defaults, overrides)
+    validate_required_subagents(defaults, agents)
     global_rules = overrides.get('permissions', [])
     if not isinstance(global_rules, list) or any(
             not isinstance(r, dict) or not all(isinstance(r.get(k), str) for k in ('action', 'resource', 'effect'))
@@ -78,9 +91,6 @@ def validate_overrides(target, defaults, overrides=None):
             raise ValueError(f'Invalid project override for {role}')
         if role in ('Stan', 'Chef') and custom.get('model', shared['model']) != shared['model']:
             raise ValueError(f'Project override conflicts with pinned {role} model')
-        if role in ('Butters', 'Kyle', 'Stan', 'Chef'):
-            if custom.get('disabled') or custom.get('mode', 'subagent') != 'subagent':
-                raise ValueError(f'Project override disables or changes required role {role}')
         if role == 'Chef' and ('system' in custom or 'request' in custom):
             raise ValueError('Project override conflicts with Chef planning policy or request settings')
         rules = custom.get('permissions', [])

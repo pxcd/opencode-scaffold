@@ -174,7 +174,7 @@ configuration overrides still follow the project's own workflow.
 
 For a scaffold installation or upgrade, start the native Kyle handoff with
 `Scaffold QA: staged` on its own line. After confirming the checkout and frozen
-scope, Kyle's first executable gate is `python3.12 .opencode/verify-scaffold.py --qa`.
+scope, Kyle's first executable gate is `git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa`.
 Its receipt covers the staged manifest, coordinator wiring and override regressions,
 and the managed plugin suites. Run the project's other applicable gates as well.
 The managed Cartman and Desktop build defaults match. Project step limits may

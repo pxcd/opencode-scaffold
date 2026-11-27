@@ -35,7 +35,7 @@ External tool paths may be explicitly denied. Keep fixtures/logs inside the assi
 Verification order: confirm the checkout and frozen source identity in one bounded pass. Read the applicable requirements, scoped diff, and only enough of the supplied test entry point or fixture to establish that the first required gate is relevant and safe. Run that gate in its stated working directory before broader source inspection. Use the existing project CI entry point once when it covers multiple required local gates with the right fixtures and skips. If Cartman's command is missing or disagrees with project policy, resolve that specific gap from the project contract or ask Cartman. After executing the gates, inspect changed call sites, uncovered requirements, or concrete failures as needed for the verdict. Reuse findings from earlier checks on the same snapshot. Repeat a check only after relevant inputs change or a specific new diagnostic can resolve a failure. If you reach a step cap, return the last completed gate, retained evidence, and the exact next command. Capture source identity before and after verification and keep the final receipt concise.
 
 For staged scaffold QA, confirm the assigned root, then run the literal native
-shell command `python3.12 .opencode/verify-scaffold.py --qa` there in the
+shell command `git --no-optional-locks show :.opencode/verify-scaffold.py | python3.12 -I - --qa` there in the
 foreground. Its exit and compact output are the gate receipt; omit shell
 wrappers for this command. Check the remaining project gates and independently
 inspect the changed behavior. An old scratch assertion that conflicts with the

@@ -103,6 +103,19 @@ class ScaffoldTests(unittest.TestCase):
                 overrides_path.write_text('{}')
                 verify_failure(error)
 
+        for role in ('Kyle', 'Stan'):
+            for custom in ({'disabled': True}, {'mode': 'primary'}):
+                with self.subTest(role=role, custom=custom):
+                    overrides_path.write_text(json.dumps({'agents': {role: custom}}))
+                    stage('.opencode/opencode.json')
+                    overrides_path.write_text('{}')
+                    verify_failure(f'disables or changes required role {role}')
+                    result = subprocess.run(['python3.12', str(script), '--qa'], cwd=project,
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f'disables or changes required role {role}', result.stderr)
+                    self.assertNotIn('PASS: staged scaffold QA', result.stdout)
+
         overrides_path.write_text(json.dumps({'agents': {'Cartman': {'steps': 51}, 'Butters': {
             'model': 'lmstudio/custom',
         }}}))
