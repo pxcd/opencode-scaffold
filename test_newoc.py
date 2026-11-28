@@ -565,8 +565,14 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn('mode: primary',(p/'.opencode/agents/Cartman.md').read_text())
         for role in ['Butters','Kyle']:
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
-        for role in ['Butters','Kyle','title','summary']:
+        for role in ['Butters','title','summary']:
             self.assertEqual(config['agents'][role]['model'], 'lmstudio/qwen/qwen3.8-27b')
+        kyle_id = 'qwen3-coder-30b-a3b-instruct-mlx'
+        self.assertEqual(config['agents']['Kyle']['model'], f'lmstudio/{kyle_id}')
+        kyle_model = config['providers']['lmstudio']['models'][kyle_id]
+        self.assertEqual(kyle_model['limit'], {'context': 131072, 'output': 8192})
+        self.assertTrue(kyle_model['capabilities']['tools'])
+        self.assertEqual(kyle_model['body'], {'temperature': 0.2})
         self.assertEqual(config['agents']['compaction']['model'],
                          'lmstudio/qwen3.8-27b-compaction')
         for role in ['Cartman','Stan','build']:
@@ -583,6 +589,15 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(compaction['body'], qwen['body'])
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
         self.assertFalse(list(p.rglob('__pycache__')))
+
+    def test_source_and_template_share_kyle_model(self):
+        upstream = json.loads((HERE/'opencode.json').read_text())
+        template = json.loads((HERE/'files/opencode.json').read_text())
+        route = template['agents']['Kyle']['model']
+        provider, model = route.split('/', 1)
+        self.assertEqual(upstream['agents']['Kyle']['model'], route)
+        self.assertEqual(upstream['providers'][provider]['models'][model],
+                         template['providers'][provider]['models'][model])
 
     def test_cloud_model_update_retires_old_pins_and_preserves_local_overrides(self):
         self.assertEqual(self.run_tool('cloud-update', '--root', str(self.root)).returncode, 0)

@@ -26,8 +26,9 @@ models, applications, inference or project publication are started by setup.
 The native IDs are now **Cartman** (coordinator), **Butters** (all behavior/UI
 implementation), **Kyle** (fresh independent local QA) and **Stan** (fresh independent
 read-only code review). Desktop `build` loads Cartman's policy. The separate probe
-builder is retired. Butters and Kyle use local Qwen3.8-27B. Cartman and Stan
-retain Sol. Maintenance helpers retain their existing purpose and routes.
+builder is retired. Butters uses local Qwen3.8-27B, and Kyle uses local
+Qwen3-Coder-30B-A3B-Instruct MLX. Cartman and Stan use Sol. Maintenance helpers
+retain their existing purpose and routes.
 
 Managed HANDOFFS.md supplies brief in-character banter at real assignments,
 acknowledgements, checkpoints and verdicts, especially Cartman theatrically blaming
@@ -61,8 +62,12 @@ for the current team. A partial new team fails instead of falling back to old ro
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
-Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch only Butters, Kyle, Stan and Chef. All subagents have delegation denied. Butters, Kyle, title, and summary use `lmstudio/qwen/qwen3.8-27b` with a
-131,072-token context and `reasoning_effort: none`. Compaction uses the same LM
+Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch
+only Butters, Kyle, Stan and Chef. All subagents have delegation denied.
+Kyle uses `lmstudio/qwen3-coder-30b-a3b-instruct-mlx` with a 131,072-token
+context and an 8,192-token output budget. Butters, title, and summary use
+`lmstudio/qwen/qwen3.8-27b` with a 131,072-token context and
+`reasoning_effort: none`. Compaction uses the same LM
 Studio model through `lmstudio/qwen3.8-27b-compaction`, with a 16,384-token output
 budget. Cartman, its desktop `build` alias
 and Stan use cloud Sol. Chef uses cloud GPT-6.2 Astra High for scoped, read-only
@@ -75,7 +80,8 @@ endpoint and model files live on each machine. For just-in-time loading, save
 Splash as the Qwen model's engine override, set its context to 131,072 tokens and
 select `incoai/Qwen3.8-27B-DFlash2` as its draft in LM Studio. Enable Just-in-Time
 Model Loading in Model Server settings. The first request to `qwen/qwen3.8-27b`
-loads the saved engine, target, and draft configuration.
+loads the saved engine, target, and draft configuration. Save Kyle’s Coder
+model with a 131,072-token context in LM Studio as well.
 
 On another machine, register providers/models and set project overrides in
 `.opencode/opencode.json`; keep root `opencode.json` as the managed defaults. An optional local.json, copied from local.example.json,

@@ -25,16 +25,30 @@ function setup() {
   };
   return { state, pr, github, context, core, put };
 }
-test('missing receipt blocks and a matching immutable trusted receipt passes', async () => {
-  const x = setup(); await handle(x); assert.equal(x.state.checks.at(-1).conclusion, 'failure');
-  x.state.receipts = [check()]; x.put(); await handle(x); assert.equal(x.state.checks.at(-1).conclusion, 'success');
+test('an unreviewed head stays pending and recording PASS completes the same required check', async () => {
+  const x = setup();
+  await handle(x);
+  const waiting = x.state.checks.at(-1);
+  assert.equal(waiting.status, 'in_progress');
+  assert.equal(waiting.output.title, 'Awaiting AI review');
+  assert.equal(waiting.conclusion, undefined);
+  assert.deepEqual(x.state.failures, []);
+  x.context.eventName = 'workflow_dispatch';
+  x.context.payload.inputs = input();
+  x.put(42);
+  await handle({ ...x, phase: 'publish' });
+  const recorded = x.state.checks.at(-1);
+  assert.equal(recorded.check_run_id, waiting.check_run_id);
+  assert.equal(recorded.status, 'completed');
+  assert.equal(recorded.conclusion, 'success');
 });
 test('forged metadata pointing to an unrelated owner run cannot pass', async () => {
   const x = setup(); x.state.receipts = [check()]; x.put(10, { pr: 99 }); await handle(x); assert.equal(x.state.checks.at(-1).conclusion, 'failure');
 });
 test('stale head, foreign PR/app and malformed pointer cannot satisfy the gate', async () => {
   for (const bad of [check({ external_id: receiptID(7, OLD, BASE, 10) }), check({ external_id: receiptID(8, HEAD, BASE, 10) }), check({ app: { slug: 'other' } }), check({ external_id: 'fabricated' })]) {
-    const x = setup(); x.state.receipts = [bad]; x.put(); await handle(x); assert.equal(x.state.checks.at(-1).conclusion, 'failure');
+    const x = setup(); x.state.receipts = [bad]; x.put(); await handle(x); assert.equal(x.state.checks.at(-1).status, 'in_progress');
+    assert.equal(x.state.failures.length, 0);
   }
 });
 test('base movement leaves an already reviewed immutable head valid', async () => {
@@ -42,7 +56,8 @@ test('base movement leaves an already reviewed immutable head valid', async () =
 });
 test('receipts must originate from owner-dispatched default-branch gate runs', async () => {
   for (const bad of [{ event: 'pull_request' }, { path: '.github/workflows/ci.yml' }, { head_branch: 'feature' }, { actor: { login: 'contributor' } }]) {
-    const x = setup(); Object.assign(x.state.run, bad); x.state.receipts = [check()]; x.put(); await handle(x); assert.equal(x.state.checks.at(-1).conclusion, 'failure');
+    const x = setup(); Object.assign(x.state.run, bad); x.state.receipts = [check()]; x.put(); await handle(x); assert.equal(x.state.checks.at(-1).status, 'in_progress');
+    assert.equal(x.state.failures.length, 0);
   }
 });
 test('newest dispatch failure wins even if an older passing check was recreated later', async () => {
@@ -88,7 +103,10 @@ test('input and ZIP validation fail closed, while report contents are inert', as
 });
 test('an explicit failed review remains a blocking check', async () => {
   const x = setup(); x.context.eventName = 'workflow_dispatch'; x.context.payload.inputs = input({ verdict: 'fail' }); x.put(42, { verdict: 'fail' });
-  await handle({ ...x, phase: 'publish' }); assert.equal(x.state.checks.at(-1).conclusion, 'failure'); assert.equal(x.state.failures.length, 1);
+  await handle({ ...x, phase: 'publish' });
+  assert.equal(x.state.checks.at(-1).conclusion, 'failure');
+  assert.match(x.state.checks.at(-1).output.summary, /recorded review failed/);
+  assert.equal(x.state.failures.length, 1);
 });
 
 test('lookup failure leaves the required projection pending, never an older green result', async () => {
