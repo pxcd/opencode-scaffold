@@ -217,8 +217,10 @@ The `/ship` plugin also supports this source checkout. Open the repository root
 on a feature branch. The root `opencode.json` loads native release roles using the
 prompts in `files/.opencode/agents/`; the machine still supplies provider access.
 The source checkout uses its own CI and `.github/REVIEW.md`. The confirmation
-includes a release tag only when the proposed `TEMPLATE_VERSION` differs from
-the cached default branch. The plugin never deploys a scaffold into this repo.
+lists a release tag only when the outgoing changes include a `TEMPLATE_VERSION`
+change that differs from the cached default branch. If both branches changed the
+version differently, reconcile them before running `/ship`. The plugin never
+deploys a scaffold into this repo.
 
 After merge and verification, run from local `main`:
 
