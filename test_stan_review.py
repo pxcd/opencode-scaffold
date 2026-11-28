@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -49,7 +50,7 @@ class StanReviewTests(unittest.TestCase):
         with patch.object(POLICY.Path, 'cwd', return_value=self.root), \
              patch.object(POLICY, 'git', side_effect=self.git), \
              patch.object(POLICY, 'github', side_effect=answers.__getitem__):
-            return POLICY.authorization(2, self.head)
+            return POLICY.authorization(2, self.head, self.base)
 
     def test_same_repo_admin_receives_portable_approval(self):
         status, description = self.check()
@@ -68,7 +69,7 @@ class StanReviewTests(unittest.TestCase):
 
     def test_pr_base_head_and_origin_must_agree(self):
         self.refs['commit']['sha'] = self.head
-        with self.assertRaisesRegex(ValueError, 'live default branch'):
+        with self.assertRaisesRegex(ValueError, 'trusted helper revision'):
             self.check()
         self.refs['commit']['sha'] = self.base
         self.pr['head']['sha'] = self.base
@@ -78,6 +79,28 @@ class StanReviewTests(unittest.TestCase):
         self.git('remote', 'set-url', '--push', 'origin', 'https://github.com/elsewhere/private-tool')
         with self.assertRaisesRegex(ValueError, 'push repositories differ'):
             self.check()
+
+    def test_trusted_base_blob_ignores_index_and_worktree_helpers(self):
+        helper = self.root / '.opencode/stan-review.py'
+        helper.parent.mkdir()
+        helper.write_bytes(Path(SPEC.origin).read_bytes())
+        path = str(helper.relative_to(self.root))
+        self.git('add', path)
+        self.git('commit', '-qm', 'Install the trusted helper')
+        base = self.git('rev-parse', 'HEAD')
+        helper.write_text("print('STANDING_APPROVAL: untrusted index')\n")
+        self.git('add', path)
+        helper.write_text("print('STANDING_APPROVAL: untrusted working copy')\n")
+        (self.root / POLICY.OPT_OUT).touch()
+
+        trusted_source = self.git('--no-replace-objects', 'show', f'{base}:{path}')
+        result = subprocess.run(
+            [sys.executable, '-I', '-', '--pr', '2', '--head', base, '--trusted-base', base],
+            input=trusted_source + '\n', cwd=self.root, capture_output=True, text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'LOCAL_ONLY: the checkout or index opts out')
 
     def test_local_and_staged_markers_opt_out_even_without_network(self):
         marker = self.root / POLICY.OPT_OUT
@@ -109,6 +132,10 @@ class StanReviewTests(unittest.TestCase):
         self.head = self.git('rev-parse', 'HEAD')
         self.pr['head']['sha'] = self.head
         self.git('rm', '-q', POLICY.OPT_OUT)
+        # A missing base must not hide a marker committed in the candidate head.
+        self.base = '1' * 40
+        self.refs['commit']['sha'] = self.base
+        self.pr['base']['sha'] = self.base
         self.assertEqual(self.check()[0], 'LOCAL_ONLY')
 
 

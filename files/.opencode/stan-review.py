@@ -35,12 +35,14 @@ def repository(remote):
     return match[1].lower()
 
 
-def authorization(number, head):
+def authorization(number, head, trusted_base):
     root = Path.cwd().resolve()
     if Path(git('rev-parse', '--show-toplevel')).resolve() != root:
         raise ValueError('run from the confirmed repository root')
     if os.path.lexists(root / OPT_OUT) or git('ls-files', '--stage', '--', OPT_OUT):
         return 'LOCAL_ONLY', 'the checkout or index opts out'
+    if git('ls-tree', head, '--', OPT_OUT):
+        return 'LOCAL_ONLY', 'the PR head opts out'
     if git('rev-parse', 'HEAD') != head:
         raise ValueError('local HEAD differs from the requested review head')
     origin = repository(git('remote', 'get-url', '--all', 'origin'))
@@ -59,11 +61,10 @@ def authorization(number, head):
         raise ValueError('PR identity, default base or exact review head cannot be verified')
 
     live_base = github(f"repos/{origin}/branches/{quote(base['ref'], safe='')}")['commit']['sha']
-    if not re.fullmatch('[a-f0-9]{40}', live_base) or live_base != base['sha']:
-        raise ValueError('the live default branch does not match the PR base')
-    for revision in (live_base, head):
-        if git('ls-tree', revision, '--', OPT_OUT):
-            return 'LOCAL_ONLY', 'the default branch or PR head opts out'
+    if not re.fullmatch('[a-f0-9]{40}', live_base) or live_base != base['sha'] or live_base != trusted_base:
+        raise ValueError('the trusted helper revision does not match the live PR base')
+    if git('ls-tree', live_base, '--', OPT_OUT):
+        return 'LOCAL_ONLY', 'the default branch opts out'
     if repo['permissions']['admin'] is not True:
         raise ValueError('the authenticated GitHub account does not administer the repository')
     return 'STANDING_APPROVAL', f'github.com/{origin} PR #{number}, base {live_base}, head {head}'
@@ -73,11 +74,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pr', required=True, type=int)
     parser.add_argument('--head', required=True)
+    parser.add_argument('--trusted-base', required=True)
     args = parser.parse_args()
-    if args.pr < 1 or not re.fullmatch('[a-f0-9]{40}', args.head):
-        parser.error('a positive PR number and full lowercase head SHA are required')
+    if args.pr < 1 or any(not re.fullmatch('[a-f0-9]{40}', sha) for sha in (args.head, args.trusted_base)):
+        parser.error('a positive PR number and full lowercase head and trusted base SHAs are required')
     try:
-        status, reason = authorization(args.pr, args.head)
+        status, reason = authorization(args.pr, args.head, args.trusted_base)
     except (ValueError, OSError, subprocess.SubprocessError, KeyError, TypeError) as error:
         status = 'ASK'
         reason = str(error) if type(error) is ValueError else 'required repository or GitHub metadata could not be verified'

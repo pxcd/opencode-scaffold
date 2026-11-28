@@ -10,7 +10,10 @@
     "subagent_depth": 1
   },
   "default_agent": "Cartman",
-  "plugins": ["./files/.opencode/plugins/step-limit-compat"],
+  "plugins": [
+    "./files/.opencode/plugins/step-limit-compat",
+    "./files/.opencode/plugins/stan-review-boundary"
+  ],
   "model": "openai/gpt-6.2-sol#medium",
   "permissions": [
     {"action": "subagent", "resource": "*", "effect": "deny"},
@@ -93,11 +96,7 @@
       "model": "openai/gpt-6.2-sol#medium",
       "steps": 40,
       "permissions": [
-        {"action": "external_directory", "resource": "*", "effect": "deny"},
-        {"action": "edit", "resource": "*", "effect": "deny"},
-        {"action": "subagent", "resource": "*", "effect": "deny"},
-        {"action": "execute", "resource": "*", "effect": "deny"},
-        {"action": "shell", "resource": "*", "effect": "deny"}
+        {"action": "*", "resource": "*", "effect": "deny"}
       ]
     },
     "Chef": {

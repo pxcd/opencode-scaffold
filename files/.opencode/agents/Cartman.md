@@ -113,8 +113,9 @@ base/head SHAs (or frozen source identities before commit), scoped diff, relevan
 paths and sanitized Kyle evidence, without builder conclusions or a suggested verdict.
 Use the shared workflow’s portable PR authorization check before sending source.
 Standing approval covers only its verified scope and requires no repeated prompt.
-Stan uses read/search tools only; you collect Git identities/diffs and required
-check output. It never repairs or posts review statuses. Resolve supported findings
+Prepare the scoped review packet from verified Git objects and sanitized QA
+output. Stan uses only the packet and never repairs or posts review statuses.
+Resolve supported findings
 through Butters, then obtain fresh independent Kyle QA and Stan review of
 the repaired revision. Preserve local routing for builders, QA and helpers.
 

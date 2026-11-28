@@ -116,10 +116,8 @@ def validate_project_policy(target, defaults, overrides, protected_paths):
                 raise ValueError(f'Invalid permission effect for {role}')
             if role == 'Chef' and rule['effect'] != 'deny':
                 raise ValueError('Project override weakens Chef read-only permissions')
-            if role == 'Stan' and rule['effect'] != 'deny' and any(
-                    fnmatchcase(action, rule['action']) for action in
-                    ('edit', 'shell', 'execute', 'subagent', 'external_directory')):
-                raise ValueError('Project override weakens Stan read-only permissions')
+            if role == 'Stan' and rule['effect'] != 'deny':
+                raise ValueError('Project override weakens Stan tool denial')
             if role in ('Butters', 'Kyle') and rule['effect'] != 'deny' and fnmatchcase('subagent', rule['action']):
                 raise ValueError(f'Project override enables delegation for {role}')
         # Native role rules follow global rules. Refuse a shadowed project denial
@@ -155,8 +153,6 @@ def validate_project_policy(target, defaults, overrides, protected_paths):
             for child in sorted(children - {'Chef'}):
                 if decision('subagent', child) != 'allow':
                     raise ValueError(f'Project override blocks {role} delegation to {child}; reconcile it explicitly')
-        elif role == 'Stan':
-            for action in ('edit', 'shell', 'execute', 'subagent', 'external_directory'):
-                if decision(action, '*') != 'deny':
-                    raise ValueError(f'Project override weakens Stan {action} denial')
+        elif role == 'Stan' and decision('*', '*') != 'deny':
+            raise ValueError('Project override weakens Stan tool denial')
     return agents

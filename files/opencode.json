@@ -62,7 +62,8 @@
   "plugins": [
     "./.opencode/plugins/step-limit-compat",
     "./.opencode/plugins/continuation-guard",
-    "./.opencode/plugins/qa-retry-guard"
+    "./.opencode/plugins/qa-retry-guard",
+    "./.opencode/plugins/stan-review-boundary"
   ],
   "agents": {
     "Butters": {
@@ -342,31 +343,7 @@
       "model": "openai/gpt-6.2-sol#medium",
       "steps": 40,
       "permissions": [
-        {
-          "action": "external_directory",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "subagent",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "execute",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "shell",
-          "resource": "*",
-          "effect": "deny"
-        }
+        {"action": "*", "resource": "*", "effect": "deny"}
       ]
     },
     "build": {

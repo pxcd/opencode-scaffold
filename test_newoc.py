@@ -723,9 +723,11 @@ class ScaffoldTests(unittest.TestCase):
         for field in ['model','steps','permissions']:
             self.assertEqual(desktop[field],explicit[field])
         self.assertIn({'action':'subagent','resource':'*','effect':'deny'},config['permissions'])
-        for role in ['Butters','Kyle','Stan']:
+        for role in ['Butters','Kyle']:
             self.assertIn({'action':'subagent','resource':'*','effect':'deny'},
                           config['agents'][role]['permissions'])
+        self.assertIn({'action':'*','resource':'*','effect':'deny'},
+                      config['agents']['Stan']['permissions'])
 
     def test_sentry_is_cloud_read_only_and_dispatchable(self):
         self.assertEqual(self.run_tool('review', '--root', str(self.root)).returncode, 0)
@@ -739,9 +741,9 @@ class ScaffoldTests(unittest.TestCase):
                 input=text, text=True))
         sentry = header('Stan')
         self.assertEqual(sentry['mode'], 'subagent')
-        for action in ['edit', 'shell', 'execute', 'subagent', 'external_directory']:
-            self.assertEqual([rule for rule in config['agents']['Stan']['permissions'] if rule['action'] == action],
-                             [{'action': action, 'resource': '*', 'effect': 'deny'}])
+        self.assertEqual(config['agents']['Stan']['permissions'],
+                         [{'action': '*', 'resource': '*', 'effect': 'deny'}])
+        self.assertIn('./.opencode/plugins/stan-review-boundary', config['plugins'])
         self.assertIn({'action': 'subagent', 'resource': 'Stan', 'effect': 'allow'},
                       config['agents']['Cartman']['permissions'])
         self.assertIn('.opencode/agents/Stan.md',
@@ -1175,7 +1177,7 @@ class ScaffoldTests(unittest.TestCase):
         p=self.root/'conflict';config=p/'.opencode/opencode.json'
         cases=[{'agents': {'Cartman': {'permissions': [{'action':'subagent','resource':'Stan','effect':'deny'}]}}},
                {'agents': {'Stan': {'model':'lmstudio/wrong-route'}}},
-               {'agents': {'Stan': {'permissions':[{'action':'edit','resource':'Sources/*','effect':'allow'}]}}},
+               {'agents': {'Stan': {'permissions':[{'action':'read','resource':'Sources/*','effect':'allow'}]}}},
                {'agents': {'Butters': {'permissions':[{'action':'subagent','resource':'*','effect':'allow'}]}}},
                {'agents': {'Kyle': {'disabled':True}}},
                {'agents': {'Stan': {'disabled':True}}}]
@@ -1297,6 +1299,9 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
                                          'openai' if role in ['Cartman','build','Stan'] else 'lmstudio')
                         expected='ask' if role in ['Cartman','build'] else 'deny'
                         self.assertEqual(permission('external_directory',str(self.root/'other-checkout')+'/*'),expected)
+                        if role == 'Stan':
+                            for action in ['read', 'grep', 'shell', 'edit', 'custom_mcp_tool']:
+                                self.assertEqual(permission(action, 'README.md'), 'deny', action)
                         # Check both tool-relative and absolute resources through the native engine.
                         if role in ['Butters','Kyle']:
                             for path in ['opencode.json','opencode.jsonc','.opencode/opencode.json',
@@ -1387,9 +1392,9 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
             rules=[r for r in agents[coordinator]['permissions'] if r['action']=='subagent']
             self.assertEqual(rules[-5:],[{'action':'subagent','resource':'*','effect':'deny'},
                 *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['Butters','Kyle','Stan','Chef']]])
-        for action in ['edit','shell','execute','subagent','external_directory']:
-            rules=[r for r in agents['Stan']['permissions'] if r['action']==action and r['resource']=='*']
-            self.assertEqual(rules[-1]['effect'],'deny')
+        stan_permissions = agents['Stan']['permissions']
+        deny_all = stan_permissions.index({'action': '*', 'resource': '*', 'effect': 'deny'})
+        self.assertTrue(all(rule['effect'] == 'deny' for rule in stan_permissions[deny_all:]))
         r=subprocess.run(['opencode','debug','config','--standalone'],cwd=p,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
         documents=[d for d in json.loads(r.stdout) if d['type']=='document']

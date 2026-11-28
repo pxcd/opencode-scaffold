@@ -464,18 +464,21 @@ Shared configuration denies Git pushes for workers and helpers. Only the coordin
 ## Stan code review (3.1.0)
 
 Kyle retains independent local source assessment and executed QA. Stan is a
-fresh, read-only `openai/gpt-6.2-sol#medium` subagent for final code review, with shell,
-edits, nested execution and delegation denied. Cartman supplies a bounded diff,
-relevant paths, original acceptance, revision identities and QA evidence. Stan
+fresh `openai/gpt-6.2-sol#medium` subagent for final code review with all tools
+denied. Cartman supplies a packet containing the scoped diff and relevant source
+from Git commits, acceptance criteria, exact revisions and sanitized QA evidence.
+The native review hook excludes chat history and ambient instructions. Stan
 returns concrete findings and PASS/FAIL/BLOCKED; it never repairs or publishes.
 Cartman routes repairs to Butters and obtains fresh QA/review after changes.
 The scaffold carries standing approval across machines for scoped Stan review
 of verified same-repository GitHub PRs in repositories administered by the
 authenticated shipping account. No repo names, checkout paths, or workstation
 allowlists need to be configured. Approval covers only the exact PR diff,
-directly relevant source, and sanitized QA evidence. Cartman runs the read-only
-`.opencode/stan-review.py` check before dispatch. The upstream source repo uses
-the same helper under `files/`.
+directly relevant source, and sanitized QA evidence. Before dispatch, Cartman
+runs the authorization helper from the live default-branch commit and verifies
+the native review boundary. The first PR introducing the helper requires explicit
+scoped authorization. See the maintained workflow for the exact check and packet
+format.
 
 To opt a repository out, commit an empty `.stan-review-local-only` file at its
 root on the default branch. The marker is project-owned and survives scaffold
