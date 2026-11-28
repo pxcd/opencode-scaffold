@@ -42,6 +42,26 @@ class ScaffoldTests(unittest.TestCase):
     def run_tool(self, *args, cwd=None):
         return subprocess.run(['python3.12',str(SCRIPT),*args],cwd=cwd,text=True,capture_output=True)
 
+    def test_stan_policy_deploys_and_repo_opt_out_survives_update(self):
+        target = self.root / 'portable'
+        result = self.run_tool(target.name, '--root', str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        helper = target / '.opencode/stan-review.py'
+        manifest_path = target / '.opencode/scaffold.json'
+        manifest = json.loads(manifest_path.read_bytes())
+        digest = hashlib.sha256(helper.read_bytes()).hexdigest()
+        self.assertEqual(manifest['files'].pop('.opencode/stan-review.py'), digest)
+        manifest['version'] = '4.3.19'
+        manifest_path.write_text(json.dumps(manifest))
+        helper.unlink()
+        marker = target / '.stan-review-local-only'
+        marker.write_text('Project policy\n')
+        result = self.run_tool('--update', '--apply', cwd=target)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(marker.read_text(), 'Project policy\n')
+        self.assertEqual(hashlib.sha256(helper.read_bytes()).hexdigest(), digest)
+        self.assertEqual(json.loads(manifest_path.read_bytes())['files']['.opencode/stan-review.py'], digest)
+
     def test_scaffold_verification_uses_staged_hashes_and_role_config(self):
         result = self.run_tool('verify-index', '--root', str(self.root))
         self.assertEqual(result.returncode, 0, result.stderr)

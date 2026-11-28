@@ -141,8 +141,8 @@ stores, separate from project evidence. Do not copy or relocate old evidence.
    independent QA of the repaired source. Never waive acceptance to obtain PASS.
 6. After Kyle QA, dispatch NEW Stan for independent code review, with original
    requirements/invariants, base/head SHAs or frozen source identities, scoped diff,
-   relevant paths and raw QA evidence. Cloud-source authorization must cover this
-   review. Stan reads/searches only and returns PASS/FAIL/BLOCKED with file/line
+   relevant paths and sanitized QA evidence. Apply the Stan cloud-review policy
+   below before dispatch. Stan reads/searches only and returns PASS/FAIL/BLOCKED with file/line
    findings and limits; it does not execute tests, repair or publish. Route supported
    defects through the responsible builder, then obtain fresh Kyle QA and Stan
    review after repairs. Verify source identity before/after both independent roles.
@@ -154,6 +154,41 @@ stores, separate from project evidence. Do not copy or relocate old evidence.
    commits/pushes, deployments and external messages need task authorization.
    Escalate genuine permissions, unresolved concrete blockers or user decisions.
    Codex can assist when requested; its availability is not an execution gate.
+
+## Stan cloud-review policy
+
+Standing approval covers native Stan on `openai/gpt-6.2-sol#medium` for the exact
+head of an open PR in a GitHub repository administered by the authenticated
+shipping account. Derive the repository from the confirmed checkout's `origin`.
+Before sending source, run this read-only metadata check from the repository root:
+
+```sh
+python3.12 -I .opencode/stan-review.py --pr PR_NUMBER --head FULL_HEAD_SHA
+```
+
+In the scaffold source repository, the same helper lives at
+`files/.opencode/stan-review.py`. If the shipment changes the helper or this
+policy, use the version from the trusted default branch or obtain explicit
+scoped authorization. Review and publication are separate gates.
+
+- `STANDING_APPROVAL` covers the verified PR diff, directly relevant source,
+  and sanitized QA evidence. Proceed without asking again. Exclude secrets,
+  credentials, private runtime data, user data, raw logs, and unrelated files.
+  Use only the approved data in Stan's prompt and subsequent reads.
+- `LOCAL_ONLY` respects the repo's opt-out. A root
+  `.stan-review-local-only` marker on the verified default branch, PR head,
+  index, or working checkout opts out. Keep source local and follow the project's
+  review requirements. A candidate PR cannot lift an existing opt-out.
+- `ASK` means standing approval could not be verified. Get explicit scoped
+  authorization for a pre-PR review, a fork, a different host or provider, a
+  repository outside the authenticated account's administration, or wider data.
+  Missing metadata or an unavailable helper is not approval.
+
+Honor explicit user and project restrictions first. The portable policy
+supersedes the pilot's per-repository enrollment requirement, and a repository
+absent from an old workstation list is not an opt-out. Keep publication,
+independent QA, required review and CI, manual acceptance, and native tool
+permissions in force. This policy does not enforce filesystem isolation.
 
 ## SCM and delivery
 
@@ -197,7 +232,7 @@ supported defect and seek a decision only for a genuine unresolved policy confli
    When authorized, commit and push the feature branch and open/update a PR to
    the verified default branch. A draft PR may precede final QA/human acceptance.
 2. Obtain NEW Stan review of the exact final PR head, with base identity and
-   raw QA evidence. Resolve supported findings through builders, repeat affected
+   sanitized QA evidence. Resolve supported findings through builders, repeat affected
    checks and obtain fresh QA/review after source changes. Record the actual
    review with the repository's existing helper when available; never invent a
    passing check, impersonate human approval or assume every repo has a review gate.

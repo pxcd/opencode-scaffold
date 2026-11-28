@@ -469,8 +469,20 @@ edits, nested execution and delegation denied. Cartman supplies a bounded diff,
 relevant paths, original acceptance, revision identities and QA evidence. Stan
 returns concrete findings and PASS/FAIL/BLOCKED; it never repairs or publishes.
 Cartman routes repairs to Butters and obtains fresh QA/review after changes.
-Project cloud-source authorization applies to Stan too. No extra coordinator or
-continuous Codex supervision is introduced.
+The scaffold carries standing approval across machines for scoped Stan review
+of verified same-repository GitHub PRs in repositories administered by the
+authenticated shipping account. No repo names, checkout paths, or workstation
+allowlists need to be configured. Approval covers only the exact PR diff,
+directly relevant source, and sanitized QA evidence. Cartman runs the read-only
+`.opencode/stan-review.py` check before dispatch. The upstream source repo uses
+the same helper under `files/`.
+
+To opt a repository out, commit an empty `.stan-review-local-only` file at its
+root on the default branch. The marker is project-owned and survives scaffold
+updates. A marker in the PR or local checkout also opts out. Stricter project
+rules take precedence. Forks and unverifiable or unapproved scopes require
+explicit authorization. Existing repositories take up the policy on their next
+scaffold update.
 
 Example instruction to Cartman:
 

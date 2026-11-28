@@ -10,6 +10,7 @@
     "subagent_depth": 1
   },
   "default_agent": "Cartman",
+  "plugins": ["./files/.opencode/plugins/step-limit-compat"],
   "model": "openai/gpt-6.2-sol#medium",
   "permissions": [
     {"action": "subagent", "resource": "*", "effect": "deny"},
