@@ -42,6 +42,26 @@ class ScaffoldTests(unittest.TestCase):
     def run_tool(self, *args, cwd=None):
         return subprocess.run(['python3.12',str(SCRIPT),*args],cwd=cwd,text=True,capture_output=True)
 
+    def test_stan_policy_deploys_and_repo_opt_out_survives_update(self):
+        target = self.root / 'portable'
+        result = self.run_tool(target.name, '--root', str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        helper = target / '.opencode/stan-review.py'
+        manifest_path = target / '.opencode/scaffold.json'
+        manifest = json.loads(manifest_path.read_bytes())
+        digest = hashlib.sha256(helper.read_bytes()).hexdigest()
+        self.assertEqual(manifest['files'].pop('.opencode/stan-review.py'), digest)
+        manifest['version'] = '4.3.19'
+        manifest_path.write_text(json.dumps(manifest))
+        helper.unlink()
+        marker = target / '.stan-review-local-only'
+        marker.write_text('Project policy\n')
+        result = self.run_tool('--update', '--apply', cwd=target)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(marker.read_text(), 'Project policy\n')
+        self.assertEqual(hashlib.sha256(helper.read_bytes()).hexdigest(), digest)
+        self.assertEqual(json.loads(manifest_path.read_bytes())['files']['.opencode/stan-review.py'], digest)
+
     def test_scaffold_verification_uses_staged_hashes_and_role_config(self):
         result = self.run_tool('verify-index', '--root', str(self.root))
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -545,8 +565,14 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn('mode: primary',(p/'.opencode/agents/Cartman.md').read_text())
         for role in ['Butters','Kyle']:
             self.assertIn('mode: subagent',(p/f'.opencode/agents/{role}.md').read_text())
-        for role in ['Butters','Kyle','title','summary']:
+        for role in ['Butters','title','summary']:
             self.assertEqual(config['agents'][role]['model'], 'lmstudio/qwen/qwen3.8-27b')
+        kyle_id = 'qwen3-coder-30b-a3b-instruct-mlx'
+        self.assertEqual(config['agents']['Kyle']['model'], f'lmstudio/{kyle_id}')
+        kyle_model = config['providers']['lmstudio']['models'][kyle_id]
+        self.assertEqual(kyle_model['limit'], {'context': 131072, 'output': 8192})
+        self.assertTrue(kyle_model['capabilities']['tools'])
+        self.assertEqual(kyle_model['body'], {'temperature': 0.2})
         self.assertEqual(config['agents']['compaction']['model'],
                          'lmstudio/qwen3.8-27b-compaction')
         for role in ['Cartman','Stan','build']:
@@ -563,6 +589,15 @@ class ScaffoldTests(unittest.TestCase):
         self.assertEqual(compaction['body'], qwen['body'])
         self.assertTrue((p/'.opencode/scaffold.json').is_file())
         self.assertFalse(list(p.rglob('__pycache__')))
+
+    def test_source_and_template_share_kyle_model(self):
+        upstream = json.loads((HERE/'opencode.json').read_text())
+        template = json.loads((HERE/'files/opencode.json').read_text())
+        route = template['agents']['Kyle']['model']
+        provider, model = route.split('/', 1)
+        self.assertEqual(upstream['agents']['Kyle']['model'], route)
+        self.assertEqual(upstream['providers'][provider]['models'][model],
+                         template['providers'][provider]['models'][model])
 
     def test_cloud_model_update_retires_old_pins_and_preserves_local_overrides(self):
         self.assertEqual(self.run_tool('cloud-update', '--root', str(self.root)).returncode, 0)
@@ -703,9 +738,11 @@ class ScaffoldTests(unittest.TestCase):
         for field in ['model','steps','permissions']:
             self.assertEqual(desktop[field],explicit[field])
         self.assertIn({'action':'subagent','resource':'*','effect':'deny'},config['permissions'])
-        for role in ['Butters','Kyle','Stan']:
+        for role in ['Butters','Kyle']:
             self.assertIn({'action':'subagent','resource':'*','effect':'deny'},
                           config['agents'][role]['permissions'])
+        self.assertIn({'action':'*','resource':'*','effect':'deny'},
+                      config['agents']['Stan']['permissions'])
 
     def test_sentry_is_cloud_read_only_and_dispatchable(self):
         self.assertEqual(self.run_tool('review', '--root', str(self.root)).returncode, 0)
@@ -719,9 +756,9 @@ class ScaffoldTests(unittest.TestCase):
                 input=text, text=True))
         sentry = header('Stan')
         self.assertEqual(sentry['mode'], 'subagent')
-        for action in ['edit', 'shell', 'execute', 'subagent', 'external_directory']:
-            self.assertEqual([rule for rule in config['agents']['Stan']['permissions'] if rule['action'] == action],
-                             [{'action': action, 'resource': '*', 'effect': 'deny'}])
+        self.assertEqual(config['agents']['Stan']['permissions'],
+                         [{'action': '*', 'resource': '*', 'effect': 'deny'}])
+        self.assertIn('./.opencode/plugins/stan-review-boundary', config['plugins'])
         self.assertIn({'action': 'subagent', 'resource': 'Stan', 'effect': 'allow'},
                       config['agents']['Cartman']['permissions'])
         self.assertIn('.opencode/agents/Stan.md',
@@ -1155,7 +1192,7 @@ class ScaffoldTests(unittest.TestCase):
         p=self.root/'conflict';config=p/'.opencode/opencode.json'
         cases=[{'agents': {'Cartman': {'permissions': [{'action':'subagent','resource':'Stan','effect':'deny'}]}}},
                {'agents': {'Stan': {'model':'lmstudio/wrong-route'}}},
-               {'agents': {'Stan': {'permissions':[{'action':'edit','resource':'Sources/*','effect':'allow'}]}}},
+               {'agents': {'Stan': {'permissions':[{'action':'read','resource':'Sources/*','effect':'allow'}]}}},
                {'agents': {'Butters': {'permissions':[{'action':'subagent','resource':'*','effect':'allow'}]}}},
                {'agents': {'Kyle': {'disabled':True}}},
                {'agents': {'Stan': {'disabled':True}}}]
@@ -1277,6 +1314,9 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
                                          'openai' if role in ['Cartman','build','Stan'] else 'lmstudio')
                         expected='ask' if role in ['Cartman','build'] else 'deny'
                         self.assertEqual(permission('external_directory',str(self.root/'other-checkout')+'/*'),expected)
+                        if role == 'Stan':
+                            for action in ['read', 'grep', 'shell', 'edit', 'custom_mcp_tool']:
+                                self.assertEqual(permission(action, 'README.md'), 'deny', action)
                         # Check both tool-relative and absolute resources through the native engine.
                         if role in ['Butters','Kyle']:
                             for path in ['opencode.json','opencode.jsonc','.opencode/opencode.json',
@@ -1367,9 +1407,9 @@ print('Native create/get verified; wrong-root resume rejected; no prompt submitt
             rules=[r for r in agents[coordinator]['permissions'] if r['action']=='subagent']
             self.assertEqual(rules[-5:],[{'action':'subagent','resource':'*','effect':'deny'},
                 *[{'action':'subagent','resource':role,'effect':'allow'} for role in ['Butters','Kyle','Stan','Chef']]])
-        for action in ['edit','shell','execute','subagent','external_directory']:
-            rules=[r for r in agents['Stan']['permissions'] if r['action']==action and r['resource']=='*']
-            self.assertEqual(rules[-1]['effect'],'deny')
+        stan_permissions = agents['Stan']['permissions']
+        deny_all = stan_permissions.index({'action': '*', 'resource': '*', 'effect': 'deny'})
+        self.assertTrue(all(rule['effect'] == 'deny' for rule in stan_permissions[deny_all:]))
         r=subprocess.run(['opencode','debug','config','--standalone'],cwd=p,env=env,capture_output=True,text=True)
         self.assertEqual(r.returncode,0,r.stderr)
         documents=[d for d in json.loads(r.stdout) if d['type']=='document']

@@ -10,6 +10,10 @@
     "subagent_depth": 1
   },
   "default_agent": "Cartman",
+  "plugins": [
+    "./files/.opencode/plugins/step-limit-compat",
+    "./files/.opencode/plugins/stan-review-boundary"
+  ],
   "model": "openai/gpt-6.2-sol#medium",
   "permissions": [
     {"action": "subagent", "resource": "*", "effect": "deny"},
@@ -74,7 +78,7 @@
       "description": "Fresh independent local source review and executed checks",
       "mode": "subagent",
       "system": "{file:files/.opencode/agents/Kyle.md}",
-      "model": "lmstudio/qwen/qwen3.8-27b",
+      "model": "lmstudio/qwen3-coder-30b-a3b-instruct-mlx",
       "steps": 40,
       "permissions": [
         {"action": "external_directory", "resource": "*", "effect": "deny"},
@@ -92,11 +96,7 @@
       "model": "openai/gpt-6.2-sol#medium",
       "steps": 40,
       "permissions": [
-        {"action": "external_directory", "resource": "*", "effect": "deny"},
-        {"action": "edit", "resource": "*", "effect": "deny"},
-        {"action": "subagent", "resource": "*", "effect": "deny"},
-        {"action": "execute", "resource": "*", "effect": "deny"},
-        {"action": "shell", "resource": "*", "effect": "deny"}
+        {"action": "*", "resource": "*", "effect": "deny"}
       ]
     },
     "Chef": {
@@ -131,6 +131,31 @@
       "permissions": [
         {"action": "external_directory", "resource": "*", "effect": "deny"}
       ]
+    }
+  },
+  "providers": {
+    "lmstudio": {
+      "models": {
+        "qwen3-coder-30b-a3b-instruct-mlx": {
+          "name": "Qwen3 Coder 30B A3B Instruct",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "body": {
+            "temperature": 0.2
+          }
+        }
+      }
     }
   }
 }

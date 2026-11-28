@@ -62,7 +62,8 @@
   "plugins": [
     "./.opencode/plugins/step-limit-compat",
     "./.opencode/plugins/continuation-guard",
-    "./.opencode/plugins/qa-retry-guard"
+    "./.opencode/plugins/qa-retry-guard",
+    "./.opencode/plugins/stan-review-boundary"
   ],
   "agents": {
     "Butters": {
@@ -132,7 +133,7 @@
       ]
     },
     "Kyle": {
-      "model": "lmstudio/qwen/qwen3.8-27b",
+      "model": "lmstudio/qwen3-coder-30b-a3b-instruct-mlx",
       "steps": 40,
       "permissions": [
         {
@@ -342,31 +343,7 @@
       "model": "openai/gpt-6.2-sol#medium",
       "steps": 40,
       "permissions": [
-        {
-          "action": "external_directory",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "edit",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "subagent",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "execute",
-          "resource": "*",
-          "effect": "deny"
-        },
-        {
-          "action": "shell",
-          "resource": "*",
-          "effect": "deny"
-        }
+        {"action": "*", "resource": "*", "effect": "deny"}
       ]
     },
     "build": {
@@ -576,6 +553,25 @@
           "body": {
             "temperature": 0.2,
             "reasoning_effort": "none"
+          }
+        },
+        "qwen3-coder-30b-a3b-instruct-mlx": {
+          "name": "Qwen3 Coder 30B A3B Instruct",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          },
+          "body": {
+            "temperature": 0.2
           }
         },
         "qwen3.8-27b-compaction": {

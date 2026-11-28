@@ -108,7 +108,7 @@ async function handle({ github, context, core, phase = 'gate' }) {
   }).sort((a, b) => b.pointer.run - a.pointer.run);
   let review;
   let receipt;
-  let reason = 'No recorded review exists for this head commit';
+  let invalidReceipt = false;
   for (const candidate of candidates) {
     const { data: run } = await github.rest.actions.getWorkflowRun({ owner, repo, run_id: candidate.pointer.run });
     if (!trustedRun(run, owner, branch)) continue;
@@ -116,17 +116,26 @@ async function handle({ github, context, core, phase = 'gate' }) {
     try { review = await readReceipt(github, owner, repo, candidate.pointer); receipt = candidate.check; }
     catch (error) {
       if (!(error instanceof ReceiptError)) throw error;
-      reason = 'Latest recorded review has no valid immutable artifact';
+      invalidReceipt = true;
     }
     break;
   }
+  if (!review && !invalidReceipt) {
+    await github.rest.checks.update({ owner, repo, check_run_id: checkID, name: CHECK,
+      status: 'in_progress', details_url: runURL,
+      output: { title: 'Awaiting AI review', summary: `PR #${number} needs a review for head ${head}. Recording the verdict updates this required check.` } });
+    return;
+  }
   const passed = review?.verdict === 'pass';
+  const reason = invalidReceipt
+    ? 'The latest recorded review has no valid immutable artifact.'
+    : 'The recorded review failed.';
   await github.rest.checks.update({ owner, repo, check_run_id: checkID, name: CHECK,
     status: 'completed', conclusion: passed ? 'success' : 'failure',
     details_url: runURL,
     output: { title: passed ? 'Matching AI review recorded' : 'AI review required for this revision', summary: passed
       ? `Immutable review artifact matches PR #${number} and head ${head}.\n\nReceipt: ${receipt.html_url}`
-      : `${reason}.\n\nHave Codex or Qwen review this revision, resolve blocking findings, then use scripts/record-ai-review.py. New head commits require a new review.` } });
+      : `${reason}\n\nResolve the blocker and record the actual verdict with .github/scripts/record-ai-review.py. New head commits require a new review.` } });
   if (!passed) core.setFailed('A passing AI review for the exact head commit is required');
 }
 module.exports = { handle, validate, parseReceipt, receiptID, artifactName, decodeArchive, readReceipt };

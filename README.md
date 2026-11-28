@@ -26,8 +26,9 @@ models, applications, inference or project publication are started by setup.
 The native IDs are now **Cartman** (coordinator), **Butters** (all behavior/UI
 implementation), **Kyle** (fresh independent local QA) and **Stan** (fresh independent
 read-only code review). Desktop `build` loads Cartman's policy. The separate probe
-builder is retired. Butters and Kyle use local Qwen3.8-27B. Cartman and Stan
-retain Sol. Maintenance helpers retain their existing purpose and routes.
+builder is retired. Butters uses local Qwen3.8-27B, and Kyle uses local
+Qwen3-Coder-30B-A3B-Instruct MLX. Cartman and Stan use Sol. Maintenance helpers
+retain their existing purpose and routes.
 
 Managed HANDOFFS.md supplies brief in-character banter at real assignments,
 acknowledgements, checkpoints and verdicts, especially Cartman theatrically blaming
@@ -61,8 +62,12 @@ for the current team. A partial new team fails instead of falling back to old ro
 | Project configuration | `.opencode/opencode.json` | Native overrides for models, additional plugins/instructions and stricter per-agent permissions; never replaced |
 | Machine configuration | OpenCode provider registration/endpoints/auth; optional ignored `.opencode/local.json` | Machine-local; never commit credentials |
 
-Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch only Butters, Kyle, Stan and Chef. All subagents have delegation denied. Butters, Kyle, title, and summary use `lmstudio/qwen/qwen3.8-27b` with a
-131,072-token context and `reasoning_effort: none`. Compaction uses the same LM
+Cartman is primary, pinned to `openai/gpt-6.2-sol#medium`, and can dispatch
+only Butters, Kyle, Stan and Chef. All subagents have delegation denied.
+Kyle uses `lmstudio/qwen3-coder-30b-a3b-instruct-mlx` with a 131,072-token
+context and an 8,192-token output budget. Butters, title, and summary use
+`lmstudio/qwen/qwen3.8-27b` with a 131,072-token context and
+`reasoning_effort: none`. Compaction uses the same LM
 Studio model through `lmstudio/qwen3.8-27b-compaction`, with a 16,384-token output
 budget. Cartman, its desktop `build` alias
 and Stan use cloud Sol. Chef uses cloud GPT-6.2 Astra High for scoped, read-only
@@ -75,7 +80,8 @@ endpoint and model files live on each machine. For just-in-time loading, save
 Splash as the Qwen model's engine override, set its context to 131,072 tokens and
 select `incoai/Qwen3.8-27B-DFlash2` as its draft in LM Studio. Enable Just-in-Time
 Model Loading in Model Server settings. The first request to `qwen/qwen3.8-27b`
-loads the saved engine, target, and draft configuration.
+loads the saved engine, target, and draft configuration. Save Kyle’s Coder
+model with a 131,072-token context in LM Studio as well.
 
 On another machine, register providers/models and set project overrides in
 `.opencode/opencode.json`; keep root `opencode.json` as the managed defaults. An optional local.json, copied from local.example.json,
@@ -464,13 +470,28 @@ Shared configuration denies Git pushes for workers and helpers. Only the coordin
 ## Stan code review (3.1.0)
 
 Kyle retains independent local source assessment and executed QA. Stan is a
-fresh, read-only `openai/gpt-6.2-sol#medium` subagent for final code review, with shell,
-edits, nested execution and delegation denied. Cartman supplies a bounded diff,
-relevant paths, original acceptance, revision identities and QA evidence. Stan
+fresh `openai/gpt-6.2-sol#medium` subagent for final code review with all tools
+denied. Cartman supplies a packet containing the scoped diff and relevant source
+from Git commits, acceptance criteria, exact revisions and sanitized QA evidence.
+The native review hook excludes chat history and ambient instructions. Stan
 returns concrete findings and PASS/FAIL/BLOCKED; it never repairs or publishes.
 Cartman routes repairs to Butters and obtains fresh QA/review after changes.
-Project cloud-source authorization applies to Stan too. No extra coordinator or
-continuous Codex supervision is introduced.
+The scaffold carries standing approval across machines for scoped Stan review
+of verified same-repository GitHub PRs in repositories administered by the
+authenticated shipping account. No repo names, checkout paths, or workstation
+allowlists need to be configured. Approval covers only the exact PR diff,
+directly relevant source, and sanitized QA evidence. Before dispatch, Cartman
+runs the authorization helper from the live default-branch commit and verifies
+the native review boundary. The first PR introducing the helper requires explicit
+scoped authorization. See the maintained workflow for the exact check and packet
+format.
+
+To opt a repository out, commit an empty `.stan-review-local-only` file at its
+root on the default branch. The marker is project-owned and survives scaffold
+updates. A marker in the PR or local checkout also opts out. Stricter project
+rules take precedence. Forks and unverifiable or unapproved scopes require
+explicit authorization. Existing repositories take up the policy on their next
+scaffold update.
 
 Example instruction to Cartman:
 
